@@ -1353,7 +1353,7 @@ $("btnThisWeek").addEventListener('click',()=>{
 });
 $("doLogin").addEventListener('click',()=>{
   const u=$("loginUser").value.trim(), p=$("loginPass").value.trim();
-  if(u==="admingereja" && p==="mimin12345"){ localStorage.setItem("isAdminLoggedIn","true"); $("loginErr").classList.add('hidden'); checkAdminSession(); toast("Login berhasil"); }
+  if(u==="admingereja" && p==="mimin12345."){ localStorage.setItem("isAdminLoggedIn","true"); $("loginErr").classList.add('hidden'); checkAdminSession(); toast("Login berhasil"); }
   else { $("loginErr").textContent="Username atau password salah"; $("loginErr").classList.remove('hidden'); }
 });
 $("loginUser").addEventListener('keydown',e=>{ if(e.key==="Enter"){ $("loginPass").focus(); } });
