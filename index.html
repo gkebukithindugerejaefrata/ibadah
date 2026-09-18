@@ -44,13 +44,16 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#F6FBF7;color:#0f1c14
       </div>
     </div>
     <div class="flex items-center gap-2">
+      <button id="btnTodayPopup" title="Lihat jadwal hari ini & besok" class="relative h-10 w-10 sm:w-auto sm:h-10 sm:px-4 rounded-full bg-white border border-emerald-200 text-emerald-900 hover:bg-emerald-50 transition flex items-center justify-center gap-1.5 shadow-sm shrink-0">
+        <span class="text-[18px] leading-none">🔔</span><span class="hidden sm:inline text-[13px] font-semibold">Hari Ini</span><span id="todayBadge" class="hidden absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] px-1 rounded-full bg-red-600 text-white text-[11px] font-bold items-center justify-center border-2 border-white shadow leading-none"></span>
+      </button>
       <div id="adminStatus" class="hidden text-[11px] font-bold px-3 py-1 rounded-full green-grad text-white">ADMIN AKTIF</div>
       <button id="btnAdmin" class="h-10 px-5 rounded-full bg-emerald-900 text-white text-[13px] font-semibold hover:bg-emerald-950 transition">Admin</button>
     </div>
   </div>
 </header>
 
-<main class="max-w-[1160px] mx-auto px-5 sm:px-8 pb-28">
+<main class="max-w-[1160px] mx-auto px-5 sm:px-8 pb-10">
   <!-- HERO -->
   <div id="heroSection" class="pt-8 sm:pt-12 grid lg:grid-cols-[1.15fr_.85fr] gap-8 items-end">
     <div>
@@ -96,7 +99,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#F6FBF7;color:#0f1c14
   <div id="content" class="hidden mt-8">
     <div id="activeInfo" class="mb-6 flex flex-wrap items-center gap-3"></div>
     <div id="cardsGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
-    <div id="publicPagination" class="mt-8 flex flex-wrap items-center justify-center gap-2"></div>
+    <div id="publicPagination" class="mt-6 flex flex-wrap items-center justify-center gap-2"></div>
   </div>
 
   <div id="emptyState" class="hidden mt-10 p-12 rounded-[32px] bg-white border border-emerald-100 text-center shadow-sm">
@@ -175,7 +178,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#F6FBF7;color:#0f1c14
       </div>
 
       <div id="adminContent" class="mt-8"></div>
-      <div id="adminPagination" class="mt-8 flex flex-wrap items-center justify-center gap-2"></div>
+      <div id="adminPagination" class="mt-6 flex flex-wrap items-center justify-center gap-2"></div>
       <div id="adminFormWrap" class="hidden mt-8 p-7 rounded-[28px] bg-white border border-emerald-100 shadow-sm">
         <div class="flex justify-between items-center"><h3 id="formTitle" class="font-serif text-[26px]">Tambah Jadwal</h3><button id="closeForm" class="w-9 h-9 rounded-full bg-stone-100 flex items-center justify-center">✕</button></div>
         <div class="mt-6 grid sm:grid-cols-2 gap-4">
@@ -192,6 +195,27 @@ Dkn. Taryuni, Dkn. Leo Adano"></textarea></div>
           <div><label class="text-[10px] font-bold tracking-widest">LATITUDE</label><input id="f_lat" type="number" step="any" class="mt-1 w-full h-11 px-3 rounded-xl border border-stone-200"></div>
           <div><label class="text-[10px] font-bold tracking-widest">LONGITUDE</label><input id="f_lng" type="number" step="any" class="mt-1 w-full h-11 px-3 rounded-xl border border-stone-200"></div>
           <div class="sm:col-span-2"><label class="text-[10px] font-bold tracking-widest">LINK GOOGLE MAPS (auto parse)</label><input id="f_mapsLink" class="mt-1 w-full h-11 px-3 rounded-xl border border-stone-200" placeholder="https://maps.app.goo.gl/..."><div id="mapsParseInfo" class="mt-1 text-[11px] text-stone-500"></div></div>
+          <div class="sm:col-span-2 p-4 rounded-[18px] bg-gradient-to-br from-emerald-50 to-lime-50/50 border border-emerald-200/70">
+            <div class="flex items-center justify-between">
+              <label class="text-[10px] font-bold tracking-[0.14em] text-emerald-900">📍 LOKASI TERSIMPAN (FAVORIT)</label>
+              <span id="savedCount" class="text-[10px] px-2.5 py-1 rounded-full bg-white border border-emerald-200 font-semibold">0 tersimpan</span>
+            </div>
+            <div class="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+              <select id="savedLocSelect" class="h-11 px-3 rounded-xl border border-emerald-200 bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-700">
+                <option value="">-- Pilih lokasi tersimpan --</option>
+              </select>
+              <div class="flex gap-2">
+                <button id="btnUseSavedLoc" type="button" class="h-11 px-4 rounded-xl bg-emerald-900 text-white text-[12px] font-semibold hover:bg-emerald-950 transition">Pakai</button>
+                <button id="btnDeleteSavedLoc" type="button" class="h-11 px-3 rounded-xl bg-white border border-red-200 text-red-600 text-[12px] hover:bg-red-50 transition">Hapus</button>
+              </div>
+            </div>
+            <div class="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+              <input id="newSavedLocName" class="h-10 px-3 rounded-xl border border-stone-200 bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="Nama lokasi, mis: Rumah Kel. Kartiman">
+              <button id="btnSaveCurrentLoc" type="button" class="h-10 px-4 rounded-xl bg-white border border-emerald-200 text-emerald-900 text-[12px] font-semibold hover:bg-emerald-50 transition flex items-center gap-1.5"><span>💾</span> Simpan Koordinat Saat Ini</button>
+            </div>
+            <div id="savedLocList" class="mt-3 flex flex-wrap gap-1.5"></div>
+            <div class="mt-2 text-[11px] leading-4 text-stone-500">💡 Simpan tempat ibadah yang sering dipakai. Koordinat & alamat akan otomatis terisi saat dipilih, jadi tidak perlu input manual lagi.</div>
+          </div>
           <div class="sm:col-span-2 flex items-center gap-2"><input id="f_showmap" type="checkbox" checked class="w-4 h-4 accent-emerald-700"><label for="f_showmap" class="text-[13px]">Tampilkan peta di popup</label></div>
         </div>
         <div class="mt-6 flex gap-2"><button id="saveForm" class="h-11 px-6 rounded-xl bg-emerald-800 text-white text-[14px] font-semibold">Simpan</button><button id="cancelForm" class="h-11 px-6 rounded-xl bg-white border border-stone-200 text-[14px]">Batal</button></div>
@@ -200,6 +224,35 @@ Dkn. Taryuni, Dkn. Leo Adano"></textarea></div>
     </div>
   </div>
 </main>
+
+
+<!-- TODAY & TOMORROW POPUP -->
+<div id="todayPopup" class="fixed inset-0 z-[65] hidden">
+  <div id="todayPopupBackdrop" class="absolute inset-0 bg-emerald-950/60 backdrop-blur-md"></div>
+  <div class="absolute inset-0 flex items-end sm:items-center justify-center p-0 sm:p-6">
+    <div class="w-full sm:max-w-[440px] bg-white rounded-t-[28px] sm:rounded-[28px] shadow-2xl border border-emerald-100 overflow-hidden max-h-[90vh] flex flex-col">
+      <div class="px-6 pt-6 pb-4 flex items-start justify-between shrink-0">
+        <div>
+          <div class="w-10 h-10 rounded-full green-grad flex items-center justify-center text-white text-[18px]">🔔</div>
+          <h3 class="mt-3 font-serif text-[26px] leading-none">Jadwal Terdekat</h3>
+          <p class="mt-1.5 text-[12px] text-stone-500">Jadwal ibadah <b>hari ini</b> & <b>besok</b> — klik untuk detail</p>
+          <div id="todayPopupDate" class="mt-2 text-[11px] px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-100 inline-block"></div>
+        </div>
+        <button id="closeTodayPopup" class="w-9 h-9 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition">✕</button>
+      </div>
+      <div id="todayPopupList" class="px-3 pb-2 overflow-auto flex-1 space-y-2.5"></div>
+      <div id="todayPopupEmpty" class="hidden px-6 py-8 text-center">
+        <div class="w-12 h-12 mx-auto rounded-full bg-stone-100 flex items-center justify-center text-[20px]">☕</div>
+        <div class="mt-3 font-semibold text-[14px]">Tidak ada jadwal hari ini & besok</div>
+        <div class="text-[12px] text-stone-500 mt-1">Istirahat sejenak, cek pekan lainnya</div>
+      </div>
+      <div class="p-4 bg-stone-50 border-t border-stone-100 flex gap-2 shrink-0">
+        <button id="btnCloseTodayPopup2" class="flex-1 h-10 rounded-full bg-white border border-stone-200 text-[13px] font-medium hover:bg-stone-100 transition">Tutup</button>
+        <button id="btnGoToJadwal" class="flex-1 h-10 rounded-full bg-emerald-900 text-white text-[13px] font-semibold hover:bg-emerald-950 transition">Lihat Semua Jadwal</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div id="popup" class="fixed inset-0 z-[60] hidden">
   <div id="popupBackdrop" class="absolute inset-0 bg-emerald-950/50 backdrop-blur-md"></div>
@@ -231,6 +284,18 @@ let publicPage = 1; const PUBLIC_PAGE_SIZE = 9;
 let adminPageNum = 1; const ADMIN_PAGE_SIZE = 6;
 const $ = id=>document.getElementById(id);
 const todayStart = (()=>{ const d=new Date(); d.setHours(0,0,0,0); return d; })();
+// Helper tanggal lokal WIB (fix timezone UTC bug)
+function toLocalDateStr(d){
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,'0');
+  const day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function addDaysLocal(d, days){
+  const nd=new Date(d);
+  nd.setDate(nd.getDate()+days);
+  return nd;
+}
 
 function parseDateStr(s){ if(!s) return null; const d=new Date(s+"T00:00:00"); return isNaN(d)? null : d; }
 function formatTanggalLong(d){ return new Intl.DateTimeFormat('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(d); }
@@ -293,7 +358,7 @@ function groupByWeek(events){
   events.forEach(ev=>{
     const d=parseDateStr(ev.tanggal); if(!d) return;
     const monday=getWeekStart(d);
-    const key=monday.toISOString().slice(0,10);
+    const key=toLocalDateStr(monday);
     if(!map.has(key)){ const sunday=getWeekEnd(monday); map.set(key,{key,monday,sunday,labelRange:formatRange(monday,sunday),events:[]}); }
     map.get(key).events.push(ev);
   });
@@ -351,7 +416,7 @@ function eventCard(ev, isAdmin=false){
       ${ev.alamat? `<div class="text-[12px] text-stone-500 mt-0.5">${ev.alamat}</div>`:''}
     </div>
     ${petugasList.length? `<div class="mt-4 pt-3 border-t border-stone-100"><div class="text-[10px] font-bold tracking-widest text-emerald-800/70">PETUGAS PELAYANAN</div>${renderPetugasList(ev.petugas)}</div>`:''}
-    ${isAdmin? `<div class="mt-4 flex gap-2" onclick="event.stopPropagation()"><button onclick="onEdit('${ev.id}')" class="h-8 px-3 rounded-full bg-emerald-900 text-white text-[12px] font-medium">Edit</button><button onclick="onDelete('${ev.id}')" class="h-8 px-3 rounded-full bg-white border border-red-200 text-red-700 text-[12px]">Hapus</button><button onclick="openPopupById('${ev.id}')" class="h-8 px-3 rounded-full bg-white border border-emerald-200 text-[12px]">Lihat</button></div>`:''}
+    ${isAdmin? `<div class="mt-4 flex flex-wrap gap-2" onclick="event.stopPropagation()"><button onclick="onEdit('${ev.id}')" class="h-8 px-3 rounded-full bg-emerald-900 text-white text-[12px] font-medium">Edit</button><button onclick="onDuplicate('${ev.id}')" class="h-8 px-3 rounded-full bg-white border border-emerald-300 text-emerald-800 text-[12px] font-medium hover:bg-emerald-50">📋 Duplikat</button><button onclick="onDelete('${ev.id}')" class="h-8 px-3 rounded-full bg-white border border-red-200 text-red-700 text-[12px]">Hapus</button><button onclick="openPopupById('${ev.id}')" class="h-8 px-3 rounded-full bg-white border border-emerald-200 text-[12px]">Lihat</button></div>`:''}
   </div>`;
 }
 
@@ -862,8 +927,9 @@ function adminSimpleCard(ev){
         </div>
       </div>
     </div>
-    <div class="flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-end sm:justify-start pl-12 sm:pl-0" onclick="event.stopPropagation()">
+    <div class="flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-end sm:justify-start pl-12 sm:pl-0 flex-wrap" onclick="event.stopPropagation()">
       <button onclick="onEdit('${ev.id}')" class="flex-1 sm:flex-none h-8 sm:h-7 px-3 rounded-full bg-emerald-900 text-white text-[11px] font-medium hover:bg-emerald-950">Edit</button>
+      <button onclick="onDuplicate('${ev.id}')" class="flex-1 sm:flex-none h-8 sm:h-7 px-3 rounded-full bg-white border border-emerald-300 text-emerald-800 text-[11px] hover:bg-emerald-50">Duplikat</button>
       <button onclick="onDelete('${ev.id}')" class="flex-1 sm:flex-none h-8 sm:h-7 px-3 rounded-full bg-white border border-red-200 text-red-600 text-[11px] hover:bg-red-50">Hapus</button>
       <button onclick="openPopupById('${ev.id}')" class="sm:hidden flex-1 h-8 px-3 rounded-full bg-white border border-emerald-200 text-emerald-700 text-[11px]">Lihat</button>
     </div>
@@ -969,11 +1035,259 @@ function onDelete(id){
   })();
 }
 
+
+function onDuplicate(id){
+  const ev=allEvents.find(e=>String(e.id)===String(id));
+  if(!ev){ toast("Data tidak ditemukan"); return; }
+  // Switch to add tab
+  activeTab="add";
+  document.querySelectorAll(".tabBtn").forEach(b=>{
+    b.classList.remove('bg-emerald-900','text-white');
+    b.classList.add('bg-white','border','border-emerald-200');
+    if(b.dataset.tab==="add"){
+      b.classList.add('bg-emerald-900','text-white');
+      b.classList.remove('bg-white','border','border-emerald-200');
+    }
+  });
+  renderAdmin();
+  $("adminFormWrap").classList.remove('hidden');
+  // Fill form with duplicated data, but reset ID and set tanggal to besok or hari ini + 7 hari biar mudah
+  const tomorrow = addDaysLocal(new Date(),1);
+  const dupDate = toLocalDateStr(tomorrow);
+  // Hitung hari dari tanggal duplikat
+  const dayNames = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+  const hariDup = dayNames[tomorrow.getDay()];
+  $("formTitle").textContent="Duplikat Jadwal - Edit & Simpan";
+  $("f_id").value=""; // kosongkan agar insert baru
+  $("f_hari").value=ev.hari || hariDup;
+  $("f_tanggal").value=dupDate; // default besok, user bisa ganti
+  $("f_jam").value=ev.jam ? ev.jam.slice(0,5) : "08:00";
+  $("f_nama").value=ev.nama_ibadah||"";
+  $("f_lokasi").value=ev.lokasi||"";
+  $("f_alamat").value=ev.alamat||"";
+  $("f_petugas").value=ev.petugas||"";
+  $("f_lat").value=ev.latitude!=null? ev.latitude : "";
+  $("f_lng").value=ev.longitude!=null? ev.longitude : "";
+  $("f_showmap").checked = ev.show_map!==false;
+  $("f_mapsLink").value="";
+  $("mapsParseInfo").textContent="📋 Duplikat dari jadwal "+(ev.tanggal||"")+" - ubah tanggal & simpan";
+  $("mapsParseInfo").className="mt-1 text-[11px] text-emerald-700 font-semibold";
+  // Scroll ke form
+  setTimeout(()=>{
+    document.getElementById('adminFormWrap')?.scrollIntoView({behavior:'smooth', block:'start'});
+    $("f_tanggal").focus();
+  }, 200);
+  toast("Form duplikat siap - ubah tanggal & simpan ✓");
+}
+
+// ========== SAVED LOCATIONS (KOORDINAT FAVORIT) ==========
+const SAVED_LOCS_KEY = "gke_saved_locs_v1";
+function loadSavedLocs(){
+  try{
+    const raw = localStorage.getItem(SAVED_LOCS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  }catch(e){ return []; }
+}
+function saveSavedLocs(locs){
+  localStorage.setItem(SAVED_LOCS_KEY, JSON.stringify(locs));
+}
+function renderSavedLocs(){
+  const locs = loadSavedLocs();
+  const sel = $("savedLocSelect");
+  const countEl = $("savedCount");
+  const listEl = $("savedLocList");
+  if(!sel) return;
+  // Update select
+  sel.innerHTML = '<option value="">-- Pilih lokasi tersimpan --</option>' + locs.map((l,i)=>`<option value="${i}">${l.name} • ${Number(l.lat).toFixed(5)}, ${Number(l.lng).toFixed(5)}</option>`).join('');
+  if(countEl) countEl.textContent = `${locs.length} tersimpan`;
+  // Render chips
+  if(listEl){
+    if(locs.length===0){
+      listEl.innerHTML = '<span class="text-[11px] text-stone-400">Belum ada lokasi tersimpan</span>';
+    }else{
+      listEl.innerHTML = locs.map((l,i)=>`<button type="button" data-idx="${i}" class="saved-chip px-2.5 py-1 rounded-full bg-white border border-emerald-200 text-[11px] hover:bg-emerald-50 transition">📍 ${l.name}</button>`).join('');
+      listEl.querySelectorAll('.saved-chip').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+          const idx = parseInt(btn.dataset.idx);
+          const loc = loadSavedLocs()[idx];
+          if(loc){
+            sel.value = String(idx);
+            useSavedLoc();
+          }
+        });
+      });
+    }
+  }
+}
+function useSavedLoc(){
+  const sel = $("savedLocSelect");
+  if(!sel || sel.value===""){ toast("Pilih lokasi dulu"); return; }
+  const locs = loadSavedLocs();
+  const loc = locs[parseInt(sel.value)];
+  if(!loc){ toast("Lokasi tidak ditemukan"); return; }
+  $("f_lat").value = loc.lat;
+  $("f_lng").value = loc.lng;
+  if(loc.alamat) $("f_alamat").value = loc.alamat;
+  if(loc.nama_lokasi){
+    // Jika lokasi field kosong, isi
+    if(!$("f_lokasi").value.trim()) $("f_lokasi").value = loc.nama_lokasi;
+  }
+  // Also set name input for convenience
+  $("newSavedLocName").value = loc.name;
+  $("mapsParseInfo").textContent = `✓ Dipakai: ${loc.name} (${Number(loc.lat).toFixed(6)}, ${Number(loc.lng).toFixed(6)})`;
+  $("mapsParseInfo").className="mt-1 text-[11px] text-emerald-700 font-semibold";
+  toast(`Lokasi ${loc.name} dipakai ✓`);
+}
+function deleteSavedLoc(){
+  const sel = $("savedLocSelect");
+  if(!sel || sel.value===""){ toast("Pilih lokasi yang akan dihapus"); return; }
+  const idx = parseInt(sel.value);
+  const locs = loadSavedLocs();
+  if(!locs[idx]) return;
+  if(!confirm(`Hapus lokasi tersimpan "${locs[idx].name}"?`)) return;
+  locs.splice(idx,1);
+  saveSavedLocs(locs);
+  renderSavedLocs();
+  sel.value="";
+  toast("Lokasi dihapus ✓");
+}
+function saveCurrentLoc(){
+  const lat = $("f_lat").value.trim();
+  const lng = $("f_lng").value.trim();
+  const nameInput = $("newSavedLocName").value.trim();
+  const lokasi = $("f_lokasi").value.trim();
+  const alamat = $("f_alamat").value.trim();
+  if(!lat || !lng){
+    toast("Isi Latitude & Longitude dulu (atau paste link Google Maps)");
+    return;
+  }
+  const latNum = parseFloat(lat), lngNum = parseFloat(lng);
+  if(isNaN(latNum) || isNaN(lngNum)){ toast("Koordinat tidak valid"); return; }
+  const name = nameInput || lokasi || `Lokasi ${new Date().toLocaleDateString('id-ID')}`;
+  if(!name){ toast("Beri nama lokasi"); return; }
+  const locs = loadSavedLocs();
+  // Cek duplikat nama
+  const existingIdx = locs.findIndex(l=>l.name.toLowerCase()===name.toLowerCase());
+  const newLoc = {name, lat: latNum, lng: lngNum, nama_lokasi: lokasi, alamat, created: new Date().toISOString()};
+  if(existingIdx>=0){
+    if(!confirm(`Nama "${name}" sudah ada. Timpa?`)) return;
+    locs[existingIdx]=newLoc;
+  }else{
+    locs.push(newLoc);
+  }
+  saveSavedLocs(locs);
+  renderSavedLocs();
+  $("savedLocSelect").value = String(existingIdx>=0? existingIdx : locs.length-1);
+  toast(`Lokasi "${name}" disimpan ✓`);
+}
+
+// ========== TODAY & TOMORROW POPUP ==========
+function getTodayTomorrowEvents(){
+  const todayStr = toLocalDateStr(todayStart);
+  const tomorrow = addDaysLocal(todayStart,1);
+  const tomorrowStr = toLocalDateStr(tomorrow);
+  const todayEvents = allEvents.filter(ev=>ev.tanggal===todayStr);
+  const tomorrowEvents = allEvents.filter(ev=>ev.tanggal===tomorrowStr);
+  // Sort by jam
+  const sortByJam = (a,b)=> (a.jam||"").localeCompare(b.jam||"");
+  todayEvents.sort(sortByJam);
+  tomorrowEvents.sort(sortByJam);
+  return {todayStr, tomorrowStr, todayEvents, tomorrowEvents, all: [...todayEvents, ...tomorrowEvents]};
+}
+function renderTodayPopup(){
+  const {todayStr, tomorrowStr, todayEvents, tomorrowEvents} = getTodayTomorrowEvents();
+  const listEl = $("todayPopupList");
+  const emptyEl = $("todayPopupEmpty");
+  const dateEl = $("todayPopupDate");
+  const badgeEl = $("todayBadge");
+  if(!listEl) return;
+  const total = todayEvents.length + tomorrowEvents.length;
+  // Update badge - fixed for mobile absolute position
+  if(badgeEl){
+    if(total>0){ 
+      badgeEl.textContent = total > 9 ? '9+' : total; 
+      badgeEl.classList.remove('hidden'); 
+      badgeEl.classList.add('flex'); 
+    } else { 
+      badgeEl.classList.add('hidden'); 
+      badgeEl.classList.remove('flex'); 
+    }
+  }
+  // Update date label
+  if(dateEl){
+    const fmt = new Intl.DateTimeFormat('id-ID',{weekday:'long', day:'numeric', month:'short'});
+    dateEl.textContent = `${fmt.format(todayStart)} & besok • ${total} jadwal`;
+  }
+  if(total===0){
+    listEl.classList.add('hidden');
+    if(emptyEl) emptyEl.classList.remove('hidden');
+    return;
+  }
+  if(emptyEl) emptyEl.classList.add('hidden');
+  listEl.classList.remove('hidden');
+  let html = '';
+  const renderGroup = (label, events, isToday)=>{
+    if(events.length===0) return '';
+    let g = `<div class="mt-1 mb-1 px-2 flex items-center gap-2"><div class="w-6 h-6 rounded-full ${isToday?'green-grad text-white':'bg-amber-100 border border-amber-200 text-amber-800'} flex items-center justify-center text-[10px] font-bold">${isToday?'H':'B'}</div><div class="text-[11px] font-bold tracking-[0.14em] ${isToday?'text-emerald-900':'text-amber-800'}">${label} • ${events.length} JADWAL</div></div>`;
+    g += events.map(ev=>{
+      const jam = formatJam(ev.jam);
+      const petugas = parsePetugas(ev.petugas||"");
+      const petugasPreview = petugas.slice(0,2).join(", ") + (petugas.length>2? ` +${petugas.length-2} lagi` : "");
+      return `<div data-id="${ev.id}" onclick="openPopupById('${ev.id}'); closeTodayPopup();" class="group bg-white border border-emerald-100 hover:border-emerald-300 hover:shadow-md rounded-[16px] p-3.5 cursor-pointer transition">
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span class="h-6 px-2.5 rounded-full ${getBadgeColor(ev.nama_ibadah)} text-[11px] font-semibold flex items-center">${jam} WIB</span>
+            ${isToday? '<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-900 text-white font-bold">HARI INI</span>' : '<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 border border-amber-200 text-amber-800 font-bold">BESOK</span>'}
+          </div>
+          <div class="w-6 h-6 rounded-full bg-stone-50 border border-stone-200 group-hover:bg-emerald-900 group-hover:text-white flex items-center justify-center text-[12px] transition">↗</div>
+        </div>
+        <div class="mt-2 font-bold text-[13px] leading-tight uppercase text-emerald-950 line-clamp-2">${ev.nama_ibadah||'-'}</div>
+        <div class="mt-1.5 text-[11px] text-stone-600 flex items-center gap-1.5"><span>📍</span><span class="truncate">${ev.lokasi||''}</span></div>
+        ${ev.alamat? `<div class="text-[10px] text-stone-400 truncate mt-0.5">${ev.alamat}</div>` : ''}
+        ${petugasPreview? `<div class="mt-2 text-[10px] text-stone-500 truncate">👥 ${petugasPreview}</div>` : ''}
+      </div>`;
+    }).join('');
+    return g;
+  };
+  html += renderGroup(`HARI INI - ${new Intl.DateTimeFormat('id-ID',{weekday:'long', day:'numeric', month:'long'}).format(todayStart)}`, todayEvents, true);
+  html += renderGroup(`BESOK - ${new Intl.DateTimeFormat('id-ID',{weekday:'long', day:'numeric', month:'long'}).format(addDaysLocal(todayStart,1))}`, tomorrowEvents, false);
+  listEl.innerHTML = html;
+}
+function openTodayPopup(){
+  renderTodayPopup();
+  const el = $("todayPopup");
+  if(el){ el.classList.remove('hidden'); document.body.style.overflow='hidden'; }
+}
+function closeTodayPopup(){
+  const el = $("todayPopup");
+  if(el){ el.classList.add('hidden'); document.body.style.overflow=''; }
+}
+// Auto show logic - tampilkan sekali per sesi jika ada jadwal
+function maybeAutoShowTodayPopup(){
+  try{
+    const key = "gke_today_popup_last_shown";
+    const lastShown = localStorage.getItem(key);
+    const todayStr = toLocalDateStr(todayStart);
+    // Jika sudah ditampilkan hari ini, jangan auto lagi
+    if(lastShown===todayStr) return;
+    const {all} = getTodayTomorrowEvents();
+    if(all.length>0){
+      // Delay 800ms biar halaman sudah render
+      setTimeout(()=>{
+        openTodayPopup();
+        localStorage.setItem(key, todayStr);
+      }, 900);
+    }
+  }catch(e){ console.log(e); }
+}
+
+
+
 function resetForm(){
   $("formTitle").textContent="Tambah Jadwal";
   $("f_id").value="";
   $("f_hari").value="Minggu";
-  $("f_tanggal").value=new Date().toISOString().slice(0,10);
+  $("f_tanggal").value=toLocalDateStr(new Date());
   $("f_jam").value="08:00";
   $("f_nama").value="";
   $("f_lokasi").value="";
@@ -1252,8 +1566,8 @@ function setQuickRange(type){
     if(fromEl) fromEl.value=""; if(toEl) toEl.value="";
     updateExportInfo(); return;
   }
-  if(fromEl) fromEl.value=from? from.toISOString().slice(0,10):"";
-  if(toEl) toEl.value=to? to.toISOString().slice(0,10):"";
+  if(fromEl) fromEl.value=from? toLocalDateStr(from):"";
+  if(toEl) toEl.value=to? toLocalDateStr(to):"";
   updateExportInfo();
 }
 
@@ -1274,6 +1588,12 @@ async function fetchEvents(){
   }finally{
     if(loading) loading.classList.add('hidden');
     render();
+    // New features: update badge, auto popup, saved locs
+    setTimeout(()=>{
+      try{ renderSavedLocs(); }catch(e){}
+      try{ renderTodayPopup(); }catch(e){}
+      try{ maybeAutoShowTodayPopup(); }catch(e){}
+    }, 300);
   }
 }
 
@@ -1390,6 +1710,39 @@ $("f_mapsLink").addEventListener('input',e=>{
   else if(v){ $("mapsParseInfo").textContent="Link tidak mengandung koordinat"; $("mapsParseInfo").className="mt-1 text-[11px] text-amber-600"; }
   else $("mapsParseInfo").textContent="";
 });
+// === NEW: Saved Locations listeners ===
+$("btnUseSavedLoc")?.addEventListener('click', useSavedLoc);
+$("btnDeleteSavedLoc")?.addEventListener('click', deleteSavedLoc);
+$("btnSaveCurrentLoc")?.addEventListener('click', saveCurrentLoc);
+$("savedLocSelect")?.addEventListener('change', (e)=>{
+  if(e.target.value!==""){
+    // auto preview
+    const locs = loadSavedLocs();
+    const loc = locs[parseInt(e.target.value)];
+    if(loc){
+      $("mapsParseInfo").textContent = `📍 ${loc.name} - ${loc.lat}, ${loc.lng}`;
+      $("mapsParseInfo").className="mt-1 text-[11px] text-stone-500";
+    }
+  }
+});
+// === NEW: Today Popup listeners ===
+$("btnTodayPopup")?.addEventListener('click', openTodayPopup);
+$("closeTodayPopup")?.addEventListener('click', closeTodayPopup);
+$("btnCloseTodayPopup2")?.addEventListener('click', closeTodayPopup);
+$("todayPopupBackdrop")?.addEventListener('click', closeTodayPopup);
+$("btnGoToJadwal")?.addEventListener('click', ()=>{
+  closeTodayPopup();
+  // Scroll to tabs
+  const tabsEl = document.getElementById('monthTabs');
+  if(tabsEl) window.scrollTo({top: tabsEl.offsetTop - 100, behavior:'smooth'});
+});
+document.addEventListener('keydown', (e)=>{
+  if(e.key==="Escape"){
+    const tp = $("todayPopup");
+    if(tp && !tp.classList.contains('hidden')) closeTodayPopup();
+  }
+});
+
 
 // Export arsip kustom
 $("exportFrom")?.addEventListener('change', updateExportInfo);
@@ -1413,15 +1766,17 @@ resetForm(); fetchEvents();
 document.addEventListener('DOMContentLoaded',()=>{
   const logoEls=document.querySelectorAll('#headerLogo, #footerLogo, #footerLogo2');
   logoEls.forEach(el=>{ if(el) el.src=GKE_LOGO_WEBP; });
+  try{ renderSavedLocs(); }catch(e){}
+  try{ renderTodayPopup(); }catch(e){}
 });
 setTimeout(()=>{
   const logoEls=document.querySelectorAll('#headerLogo, #footerLogo, #footerLogo2');
   logoEls.forEach(el=>{ if(el && !el.src) el.src=GKE_LOGO_WEBP; });
 }, 500);
-window.openPopupById=openPopupById; window.onEdit=onEdit; window.onDelete=onDelete;
+window.openPopupById=openPopupById; window.onEdit=onEdit; window.onDelete=onDelete; window.onDuplicate=onDuplicate; window.closeTodayPopup=closeTodayPopup; window.openTodayPopup=openTodayPopup;
 </script>
 
-<footer class="mt-20 border-t border-emerald-900/10 bg-white/70 backdrop-blur">
+<footer class="mt-8 border-t border-emerald-900/10 bg-white/70 backdrop-blur">
   <div class="max-w-[1160px] mx-auto px-5 sm:px-8 py-12 grid md:grid-cols-[1.2fr_.8fr] gap-8">
     <div>
       <div class="flex items-center gap-3">
