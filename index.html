@@ -638,12 +638,12 @@ async function shareGambar(ev){
     const d=parseDateStr(ev.tanggal);
     const hasMap = ev.latitude!=null && ev.longitude!=null && !isNaN(ev.latitude) && !isNaN(ev.longitude);
 
-    // ULTRA NARROW - 500px biar tidak terlalu lebar, TULISAN DIMAKSIMALKAN
-    const W = 500;
-    const outerPad = 10;
+    // FIX - 720px tulisan besar HD
+    const W = 720;
+    const outerPad = 16;
     const cardW = W - outerPad*2;
-    const padX = 14;
-    const padY = 12;
+    const padX = 20;
+    const padY = 20;
 
     const tmp = document.createElement('canvas');
     const tctx = tmp.getContext('2d');
@@ -661,43 +661,67 @@ async function shareGambar(ev){
     // TULISAN DIMAKSIMALKAN - BESAR
     const titleText=(ev.nama_ibadah||'-').trim().toUpperCase();
     const maxTitleW = cardW - padX*2;
-    const minTitle=28, maxTitle=34;
-    let titleSize=maxTitle, titleLH=Math.round(maxTitle*1.15), titleLines=[];
-    for(let s=maxTitle;s>=minTitle;s--){
+    // SMART TITLE - pendek = besar, panjang = otomatis kecil
+    const maxTitle = 44; // default besar untuk judul pendek
+    const minTitle = 24; // paling kecil untuk judul super panjang
+    let titleSize = maxTitle;
+    let titleLH = Math.round(maxTitle*1.25);
+    let titleLines = [];
+    
+    // Tentukan ukuran awal berdasarkan panjang karakter
+    const titleLen = titleText.length;
+    let startSize = maxTitle;
+    if (titleLen > 80) startSize = 28;      // super panjang >80 char
+    else if (titleLen > 50) startSize = 32; // panjang 51-80
+    else if (titleLen > 30) startSize = 36; // sedang 31-50
+    else startSize = maxTitle;              // pendek <=30 tetap 44px JUMBO
+
+    // Cari ukuran yang pas biar muat max 10 baris tapi FULL tidak dipotong
+    for(let s=startSize; s>=minTitle; s--){
       tctx.font=`800 ${s}px 'Plus Jakarta Sans'`;
       const ls=wrap(tctx,titleText,maxTitleW);
-      if(ls.length<=2){ titleSize=s; titleLH=Math.round(s*1.15); titleLines=ls; break; }
+      if(ls.length<=10){ 
+        titleSize=s; 
+        titleLH=Math.round(s*1.25); 
+        titleLines=ls; 
+        break; 
+      }
     }
-    if(!titleLines.length){ tctx.font=`800 ${minTitle}px 'Plus Jakarta Sans'`; titleLines=wrap(tctx,titleText,maxTitleW).slice(0,2); titleSize=minTitle; titleLH=Math.round(minTitle*1.15); }
+    if(!titleLines.length){ 
+      tctx.font=`800 ${minTitle}px 'Plus Jakarta Sans'`; 
+      titleLines=wrap(tctx,titleText,maxTitleW); // FULL - tampil semua
+      titleSize=minTitle; 
+      titleLH=Math.round(minTitle*1.25); 
+    }
     const titleH=titleLines.length*titleLH;
 
     const jamStr=`${formatJam(ev.jam)} WIB`;
     const hariStr=(ev.hari||'').toUpperCase();
     const dateLong = `${d? new Intl.DateTimeFormat('id-ID',{weekday:'long', day:'numeric', month:'long', year:'numeric'}).format(d):ev.tanggal} • ${formatJam(ev.jam)} WIB`;
 
+    tctx.font="700 16px 'Plus Jakarta Sans'";
+    const jamW=tctx.measureText(jamStr).width+24;
     tctx.font="700 13px 'Plus Jakarta Sans'";
-    const jamW=tctx.measureText(jamStr).width+20;
-    tctx.font="700 11px 'Plus Jakarta Sans'";
-    const hariW=tctx.measureText(hariStr).width+16;
+    const hariW=tctx.measureText(hariStr).width+20;
 
-    tctx.font="600 12px 'Plus Jakarta Sans'";
-    const dateW=Math.min(maxTitleW, tctx.measureText(`📅 ${dateLong}`).width+22);
-    const dateH=28;
+    tctx.font="600 14px 'Plus Jakarta Sans'";
+    const dateW=Math.min(maxTitleW, tctx.measureText(`📅 ${dateLong}`).width+26);
+    const dateH=34;
 
-    tctx.font="700 14px 'Plus Jakarta Sans'";
+    tctx.font="700 18px 'Plus Jakarta Sans'";
     const lokLines=wrap(tctx,(ev.lokasi||'').trim(), maxTitleW-24);
-    tctx.font="400 11px 'Plus Jakarta Sans'";
+    tctx.font="400 13px 'Plus Jakarta Sans'";
     const almLines=ev.alamat? wrap(tctx, ev.alamat, maxTitleW-24):[];
-    const lokBoxH=12 + lokLines.length*19 + (almLines.length? 4 + almLines.length*14 : 0) + 12;
+    const lokBoxH=14 + lokLines.length*24 + (almLines.length? 6 + almLines.length*18 : 0) + 14;
 
-    tctx.font="700 13px 'Plus Jakarta Sans'";
+    tctx.font="700 15px 'Plus Jakarta Sans'";
     const petWrapped=petugasList.map(it=>wrap(tctx,it,maxTitleW-46));
-    let petH=0; petWrapped.forEach(ls=>petH+=ls.length*20+10);
+    let petH=0; petWrapped.forEach(ls=>petH+=ls.length*24+12);
 
     let bodyH=0;
     bodyH+=padY;
-    bodyH+=26;
-    bodyH+=10;
+    bodyH+=36; // logo size
+    bodyH+=20; // jarak judul dari logo header
     bodyH+=titleH;
     bodyH+=8;
     bodyH+=dateH;
@@ -728,39 +752,63 @@ async function shareGambar(ev){
     ctx.lineWidth=2;
     ctx.beginPath(); ctx.roundRect(outerPad, outerPad, cardW, cardH, 16); ctx.fill(); ctx.stroke();
 
-    let y = outerPad + padY;
+        let y = outerPad + padY;
 
-    // Top row - lebih besar
-    ctx.fillStyle="#ffffff";
-    ctx.strokeStyle="#d1d5db";
-    ctx.lineWidth=1;
-    ctx.beginPath(); ctx.roundRect(outerPad+padX, y, jamW, 26, 13); ctx.fill(); ctx.stroke();
-    ctx.fillStyle="#111827";
-    ctx.font="700 13px 'Plus Jakarta Sans'";
-    ctx.textAlign="center"; ctx.textBaseline="middle";
-    ctx.fillText(jamStr, outerPad+padX+jamW/2, y+13);
-    ctx.textAlign="left"; ctx.textBaseline="alphabetic";
+    // NEW TOP ROW - LOGO GKE + NAMA GEREJA (ganti jam/hari)
+    const logoSize = 36;
+    const logoX = outerPad + padX;
+    const logoY = y;
+    
+    // Load logo image
+    const gkeImg = new Image();
+    gkeImg.src = typeof GKE_LOGO_PNG !== 'undefined' ? GKE_LOGO_PNG : GKE_LOGO_WEBP;
+    try {
+      await new Promise((resolve, reject) => {
+        gkeImg.onload = resolve;
+        gkeImg.onerror = resolve; // jangan gagal kalau logo error
+        setTimeout(resolve, 1000); // timeout 1 detik
+      });
+      
+      // Background putih bulat untuk logo
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(logoX + logoSize/2, logoY + logoSize/2, logoSize/2 + 2, 0, Math.PI*2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+      ctx.strokeStyle = "#bbf7d0";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.clip();
+      ctx.drawImage(gkeImg, logoX, logoY, logoSize, logoSize);
+      ctx.restore();
+    } catch(e) {
+      // Fallback kalau logo gagal - gambar bulat hijau
+      ctx.fillStyle = "#16a34a";
+      ctx.beginPath();
+      ctx.arc(logoX + logoSize/2, logoY + logoSize/2, logoSize/2, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "700 14px 'Plus Jakarta Sans'";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("GKE", logoX + logoSize/2, logoY + logoSize/2);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+    }
 
-    const hariX = outerPad+padX+jamW+6;
-    ctx.fillStyle="#f3f4f6";
-    ctx.beginPath(); ctx.roundRect(hariX, y, hariW, 26, 13); ctx.fill();
-    ctx.fillStyle="#374151";
-    ctx.font="700 11px 'Plus Jakarta Sans'";
-    ctx.textAlign="center"; ctx.textBaseline="middle";
-    ctx.fillText(hariStr, hariX+hariW/2, y+13);
-    ctx.textAlign="left"; ctx.textBaseline="alphabetic";
+    // Teks GKE BUKIT HINDU, GEREJA EFRATA
+    const textX = logoX + logoSize + 10;
+    ctx.fillStyle = "#111827";
+    ctx.font = "800 15px 'Plus Jakarta Sans'";
+    ctx.textBaseline = "top";
+    ctx.fillText("GKE BUKIT HINDU", textX, logoY + 2);
+    
+    ctx.fillStyle = "#065f46";
+    ctx.font = "700 11px 'Plus Jakarta Sans'";
+    ctx.fillText("GEREJA EFRATA", textX, logoY + 21);
 
-    const pinX = hariX + hariW + 6;
-    ctx.fillStyle="#fef2f2";
-    ctx.strokeStyle="#fecaca";
-    ctx.lineWidth=1;
-    ctx.beginPath(); ctx.roundRect(pinX, y, 26, 26, 13); ctx.fill(); ctx.stroke();
-    ctx.textAlign="center"; ctx.textBaseline="middle";
-    ctx.font="12px 'Plus Jakarta Sans'";
-    ctx.fillText("📍", pinX+13, y+14);
-    ctx.textAlign="left"; ctx.textBaseline="alphabetic";
+    y+=logoSize+20; // jarak judul dari header logo - turun dikit
 
-    y+=26+10;
 
     // Judul MAKSIMAL
     ctx.fillStyle="#111827";
@@ -779,8 +827,8 @@ async function shareGambar(ev){
     ctx.lineWidth=1;
     ctx.beginPath(); ctx.roundRect(outerPad+padX, y, dateW, dateH, 14); ctx.fill(); ctx.stroke();
     ctx.fillStyle="#065f46";
-    ctx.font="600 12px 'Plus Jakarta Sans'";
-    ctx.fillText(`📅 ${dateLong}`, outerPad+padX+11, y+18);
+    ctx.font="600 14px 'Plus Jakarta Sans'";
+    ctx.fillText(`📅 ${dateLong}`, outerPad+padX+14, y+22);
     y+=dateH+10;
 
     // Lokasi - tulisan besar
@@ -792,19 +840,19 @@ async function shareGambar(ev){
 
     let ly=y+12;
     ctx.fillStyle="#111827";
-    ctx.font="700 14px 'Plus Jakarta Sans'";
+    ctx.font="700 18px 'Plus Jakarta Sans'";
     ctx.textBaseline="top";
     lokLines.forEach(ln=>{
       ctx.fillText(ln.trim(), outerPad+padX+12, ly);
-      ly+=19;
+      ly+=24;
     });
     if(almLines.length){
       ly+=3;
       ctx.fillStyle="#6b7280";
-      ctx.font="400 11px 'Plus Jakarta Sans'";
+      ctx.font="400 13px 'Plus Jakarta Sans'";
       almLines.forEach(ln=>{
         ctx.fillText(ln.trim(), outerPad+padX+12, ly);
-        ly+=14;
+        ly+=18;
       });
     }
     ctx.textBaseline="alphabetic";
@@ -816,7 +864,7 @@ async function shareGambar(ev){
       ctx.fillRect(outerPad+padX, y, maxTitleW, 1);
       y+=8;
       ctx.fillStyle="#6b7280";
-      ctx.font="700 9px 'Plus Jakarta Sans'";
+      ctx.font="700 11px 'Plus Jakarta Sans'";
       ctx.fillText("PETUGAS PELAYANAN", outerPad+padX, y);
       y+=12;
 
@@ -834,7 +882,7 @@ async function shareGambar(ev){
           if(lineIdx===0){
             ctx.fillStyle="#16a34a";
             ctx.beginPath();
-            ctx.arc(bulletX, lineY, 5, 0, Math.PI*2);
+            ctx.arc(bulletX, lineY, 6, 0, Math.PI*2);
             ctx.fill();
           }
 
@@ -845,13 +893,13 @@ async function shareGambar(ev){
             const rest=line.slice(colon+1).trim();
             // Role bold
             ctx.fillStyle="#374151";
-            ctx.font="700 13px 'Plus Jakarta Sans'";
+            ctx.font="700 15px 'Plus Jakarta Sans'";
             ctx.textAlign="left";
             ctx.fillText(role, textX, lineY);
             const roleW = tctx.measureText(role).width;
             if(rest){
               ctx.fillStyle="#111827";
-              ctx.font="500 13px 'Plus Jakarta Sans'";
+              ctx.font="500 15px 'Plus Jakarta Sans'";
               ctx.fillText(rest, textX+roleW+10, lineY);
             }
           }else{
@@ -860,7 +908,7 @@ async function shareGambar(ev){
             // Jika baris pertama dengan colon, sudah digambar di atas, skip
             if(!(lineIdx===0 && colon>0)){
               ctx.fillStyle="#111827";
-              ctx.font="500 13px 'Plus Jakarta Sans'";
+              ctx.font="500 15px 'Plus Jakarta Sans'";
               ctx.textAlign="left";
               if(lineIdx===0){
                 // Baris pertama tanpa colon
@@ -871,9 +919,9 @@ async function shareGambar(ev){
               }
             }
           }
-          py+=20;
+          py+=24;
         });
-        py+=6;
+        py+=10;
       });
       ctx.textBaseline="alphabetic";
       ctx.textAlign="left";
