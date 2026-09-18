@@ -99,7 +99,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#F6FBF7;color:#0f1c14
   <div id="content" class="hidden mt-8">
     <div id="activeInfo" class="mb-6 flex flex-wrap items-center gap-3"></div>
     <div id="cardsGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
-    <div id="publicPagination" class="mt-6 flex flex-wrap items-center justify-center gap-2"></div>
+    <div id="publicPagination" class="mt-8 flex flex-wrap items-center justify-center gap-2"></div>
   </div>
 
   <div id="emptyState" class="hidden mt-10 p-12 rounded-[32px] bg-white border border-emerald-100 text-center shadow-sm">
@@ -178,7 +178,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#F6FBF7;color:#0f1c14
       </div>
 
       <div id="adminContent" class="mt-8"></div>
-      <div id="adminPagination" class="mt-6 flex flex-wrap items-center justify-center gap-2"></div>
+      <div id="adminPagination" class="mt-8 flex flex-wrap items-center justify-center gap-2"></div>
       <div id="adminFormWrap" class="hidden mt-8 p-7 rounded-[28px] bg-white border border-emerald-100 shadow-sm">
         <div class="flex justify-between items-center"><h3 id="formTitle" class="font-serif text-[26px]">Tambah Jadwal</h3><button id="closeForm" class="w-9 h-9 rounded-full bg-stone-100 flex items-center justify-center">✕</button></div>
         <div class="mt-6 grid sm:grid-cols-2 gap-4">
@@ -284,7 +284,6 @@ let publicPage = 1; const PUBLIC_PAGE_SIZE = 9;
 let adminPageNum = 1; const ADMIN_PAGE_SIZE = 6;
 const $ = id=>document.getElementById(id);
 const todayStart = (()=>{ const d=new Date(); d.setHours(0,0,0,0); return d; })();
-// Helper tanggal lokal WIB (fix timezone UTC bug)
 function toLocalDateStr(d){
   const y=d.getFullYear();
   const m=String(d.getMonth()+1).padStart(2,'0');
@@ -633,279 +632,285 @@ async function shareIbadah(ev){
 
 // === SHARE GAMBAR DINAMIS RAPI SEPERTI CONTOH ===
 async function shareGambar(ev){
-  toast("Membuat gambar...");
-  const W = 1080;
-  const outerPad = 32;
-  const cardW = W - outerPad*2;
-  const padX = 36;
-  const padY = 28;
-  const d=parseDateStr(ev.tanggal);
-  const petugasList = parsePetugas(ev.petugas);
-  // Load GKE logo for share
-  const logoImg = await new Promise((resolve)=>{
-    const img=new Image();
-    img.onload=()=>resolve(img);
-    img.onerror=()=>resolve(null);
-    img.src=GKE_LOGO_PNG || GKE_LOGO_WEBP;
-  });
-  const tmp = document.createElement('canvas');
-  const tctx = tmp.getContext('2d');
-  const wrap = (ctx, text, maxW)=>{
-    const words=(text||'').trim().split(/\s+/);
-    const lines=[]; let cur='';
-    for(const w of words){
-      const test=cur?cur+' '+w:w;
-      if(ctx.measureText(test).width>maxW && cur){ lines.push(cur); cur=w; } else cur=test;
+  try{
+    toast("Membuat gambar HD...");
+    const petugasList = parsePetugas(ev.petugas);
+    const d=parseDateStr(ev.tanggal);
+    const hasMap = ev.latitude!=null && ev.longitude!=null && !isNaN(ev.latitude) && !isNaN(ev.longitude);
+
+    // ULTRA NARROW - 500px biar tidak terlalu lebar, TULISAN DIMAKSIMALKAN
+    const W = 500;
+    const outerPad = 10;
+    const cardW = W - outerPad*2;
+    const padX = 14;
+    const padY = 12;
+
+    const tmp = document.createElement('canvas');
+    const tctx = tmp.getContext('2d');
+    const wrap = (ctx, text, maxW)=>{
+      const words=(text||'').trim().split(/\s+/);
+      const lines=[]; let cur='';
+      for(const w of words){
+        const test=cur?cur+' '+w:w;
+        if(ctx.measureText(test).width>maxW && cur){ lines.push(cur); cur=w; } else cur=test;
+      }
+      if(cur) lines.push(cur);
+      return lines;
+    };
+
+    // TULISAN DIMAKSIMALKAN - BESAR
+    const titleText=(ev.nama_ibadah||'-').trim().toUpperCase();
+    const maxTitleW = cardW - padX*2;
+    const minTitle=28, maxTitle=34;
+    let titleSize=maxTitle, titleLH=Math.round(maxTitle*1.15), titleLines=[];
+    for(let s=maxTitle;s>=minTitle;s--){
+      tctx.font=`800 ${s}px 'Plus Jakarta Sans'`;
+      const ls=wrap(tctx,titleText,maxTitleW);
+      if(ls.length<=2){ titleSize=s; titleLH=Math.round(s*1.15); titleLines=ls; break; }
     }
-    if(cur) lines.push(cur);
-    return lines;
-  };
+    if(!titleLines.length){ tctx.font=`800 ${minTitle}px 'Plus Jakarta Sans'`; titleLines=wrap(tctx,titleText,maxTitleW).slice(0,2); titleSize=minTitle; titleLH=Math.round(minTitle*1.15); }
+    const titleH=titleLines.length*titleLH;
 
-  // ====== MEASURE ======
-  const titleText=(ev.nama_ibadah||'-').trim().toUpperCase();
-  const maxTitleW=cardW - padX*2;
-  const minTitle=22, maxTitle=30;
-  let titleSize=maxTitle, titleLH=Math.round(maxTitle*1.28), titleLines=[];
-  for(let s=maxTitle;s>=minTitle;s--){
-    tctx.font=`800 ${s}px 'Plus Jakarta Sans'`;
-    const ls=wrap(tctx,titleText,maxTitleW);
-    if(ls.length<=3){ titleSize=s; titleLH=Math.round(s*1.28); titleLines=ls; break; }
-  }
-  if(!titleLines.length){ tctx.font=`800 ${minTitle}px 'Plus Jakarta Sans'`; titleLines=wrap(tctx,titleText,maxTitleW).slice(0,3); titleSize=minTitle; titleLH=Math.round(minTitle*1.28); }
-  const titleH=titleLines.length*titleLH;
+    const jamStr=`${formatJam(ev.jam)} WIB`;
+    const hariStr=(ev.hari||'').toUpperCase();
+    const dateLong = `${d? new Intl.DateTimeFormat('id-ID',{weekday:'long', day:'numeric', month:'long', year:'numeric'}).format(d):ev.tanggal} • ${formatJam(ev.jam)} WIB`;
 
-  const jamStr=`${formatJam(ev.jam)} WIB`;
-  const hariStr=(ev.hari||'').toUpperCase();
-  const dateLong=`${d?formatTanggalLong(d):ev.tanggal} • ${formatJam(ev.jam)} WIB`;
+    tctx.font="700 13px 'Plus Jakarta Sans'";
+    const jamW=tctx.measureText(jamStr).width+20;
+    tctx.font="700 11px 'Plus Jakarta Sans'";
+    const hariW=tctx.measureText(hariStr).width+16;
 
-  tctx.font="700 14px 'Plus Jakarta Sans'";
-  const jamW=tctx.measureText(jamStr).width+28;
-  tctx.font="700 11px 'Plus Jakarta Sans'";
-  const hariW=tctx.measureText(hariStr).width+24;
+    tctx.font="600 12px 'Plus Jakarta Sans'";
+    const dateW=Math.min(maxTitleW, tctx.measureText(`📅 ${dateLong}`).width+22);
+    const dateH=28;
 
-  tctx.font="600 13px 'Plus Jakarta Sans'";
-  const dateW=Math.min(maxTitleW, tctx.measureText(`📅 ${dateLong}`).width+32);
-  const dateH=36;
+    tctx.font="700 14px 'Plus Jakarta Sans'";
+    const lokLines=wrap(tctx,(ev.lokasi||'').trim(), maxTitleW-24);
+    tctx.font="400 11px 'Plus Jakarta Sans'";
+    const almLines=ev.alamat? wrap(tctx, ev.alamat, maxTitleW-24):[];
+    const lokBoxH=12 + lokLines.length*19 + (almLines.length? 4 + almLines.length*14 : 0) + 12;
 
-  tctx.font="700 14px 'Plus Jakarta Sans'";
-  const lokLines=wrap(tctx,(ev.lokasi||'').toUpperCase(), maxTitleW-24);
-  tctx.font="400 11.5px 'Plus Jakarta Sans'";
-  const almLines=ev.alamat? wrap(tctx, ev.alamat, maxTitleW-24):[];
-  const lokBoxH=16 + lokLines.length*20 + (almLines.length? 6 + almLines.length*15 : 0) + 14;
+    tctx.font="700 13px 'Plus Jakarta Sans'";
+    const petWrapped=petugasList.map(it=>wrap(tctx,it,maxTitleW-46));
+    let petH=0; petWrapped.forEach(ls=>petH+=ls.length*20+10);
 
-  tctx.font="400 13px 'Plus Jakarta Sans'";
-  const petWrapped=petugasList.map(it=>wrap(tctx,it,maxTitleW-28));
-  let petH=0; petWrapped.forEach(ls=>petH+=ls.length*20+8);
-
-  // total height
-  let bodyH=0;
-  bodyH+=padY;
-  bodyH+=30; // top row
-  bodyH+=18;
-  bodyH+=titleH;
-  bodyH+=16;
-  bodyH+=dateH;
-  bodyH+=20;
-  bodyH+=lokBoxH;
-  if(petugasList.length){
-    bodyH+=20;
-    bodyH+=12;
+    let bodyH=0;
+    bodyH+=padY;
+    bodyH+=26;
     bodyH+=10;
-    bodyH+=petH;
+    bodyH+=titleH;
     bodyH+=8;
-  }
-  bodyH+=28;
+    bodyH+=dateH;
+    bodyH+=10;
+    bodyH+=lokBoxH;
+    if(petugasList.length){
+      bodyH+=10;
+      bodyH+=12;
+      bodyH+=petH;
+      bodyH+=4;
+    }
+    bodyH+=padY;
 
-  const cardH=bodyH;
-  const canvasH=outerPad+cardH+outerPad;
+    const cardH=bodyH;
+    const canvasH=outerPad+cardH+outerPad;
 
-  const canvas=document.createElement('canvas');
-  canvas.width=W; canvas.height=canvasH;
-  const ctx=canvas.getContext('2d');
+    const canvas=document.createElement('canvas');
+    canvas.width=W; canvas.height=canvasH;
+    const ctx=canvas.getContext('2d');
+    ctx.imageSmoothingEnabled=true;
+    ctx.imageSmoothingQuality='high';
 
-  // bg
-  ctx.fillStyle="#f0faf3";
-  ctx.fillRect(0,0,W,canvasH);
+    ctx.fillStyle="#dcfce7";
+    ctx.fillRect(0,0,W,canvasH);
 
-  // card
-  ctx.shadowColor="rgba(15,90,50,0.08)";
-  ctx.shadowBlur=28;
-  ctx.shadowOffsetY=10;
-  ctx.fillStyle="#FFFFFF";
-  ctx.beginPath(); ctx.roundRect(outerPad, outerPad, cardW, cardH, 24); ctx.fill();
-  ctx.shadowColor="transparent";
+    ctx.fillStyle="#ffffff";
+    ctx.strokeStyle="#16a34a";
+    ctx.lineWidth=2;
+    ctx.beginPath(); ctx.roundRect(outerPad, outerPad, cardW, cardH, 16); ctx.fill(); ctx.stroke();
 
-  // top accent line 6px green
-  ctx.fillStyle="#16a34a";
-  ctx.beginPath(); ctx.roundRect(outerPad, outerPad, cardW, 6, [24,24,0,0]); ctx.fill();
+    let y = outerPad + padY;
 
-  let y=outerPad+padY+6;
-
-  // top row: logo + jam + hari
-  const logoX=outerPad+padX;
-  const logoY=y+2;
-  // Draw GKE logo if loaded, else fallback circle
-  if(logoImg){
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(logoX+18, logoY+14, 18, 0, Math.PI*2);
-    ctx.clip();
-    ctx.drawImage(logoImg, logoX, logoY, 36, 36);
-    ctx.restore();
-    // border
-    ctx.strokeStyle="#bbf7d0";
+    // Top row - lebih besar
+    ctx.fillStyle="#ffffff";
+    ctx.strokeStyle="#d1d5db";
     ctx.lineWidth=1;
-    ctx.beginPath(); ctx.arc(logoX+18, logoY+14, 18, 0, Math.PI*2); ctx.stroke();
-  }else{
+    ctx.beginPath(); ctx.roundRect(outerPad+padX, y, jamW, 26, 13); ctx.fill(); ctx.stroke();
+    ctx.fillStyle="#111827";
+    ctx.font="700 13px 'Plus Jakarta Sans'";
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(jamStr, outerPad+padX+jamW/2, y+13);
+    ctx.textAlign="left"; ctx.textBaseline="alphabetic";
+
+    const hariX = outerPad+padX+jamW+6;
+    ctx.fillStyle="#f3f4f6";
+    ctx.beginPath(); ctx.roundRect(hariX, y, hariW, 26, 13); ctx.fill();
+    ctx.fillStyle="#374151";
+    ctx.font="700 11px 'Plus Jakarta Sans'";
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(hariStr, hariX+hariW/2, y+13);
+    ctx.textAlign="left"; ctx.textBaseline="alphabetic";
+
+    const pinX = hariX + hariW + 6;
+    ctx.fillStyle="#fef2f2";
+    ctx.strokeStyle="#fecaca";
+    ctx.lineWidth=1;
+    ctx.beginPath(); ctx.roundRect(pinX, y, 26, 26, 13); ctx.fill(); ctx.stroke();
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.font="12px 'Plus Jakarta Sans'";
+    ctx.fillText("📍", pinX+13, y+14);
+    ctx.textAlign="left"; ctx.textBaseline="alphabetic";
+
+    y+=26+10;
+
+    // Judul MAKSIMAL
+    ctx.fillStyle="#111827";
+    ctx.font=`800 ${titleSize}px 'Plus Jakarta Sans'`;
+    ctx.textBaseline="top";
+    titleLines.forEach(ln=>{
+      ctx.fillText(ln.trim(), outerPad+padX, y);
+      y+=titleLH;
+    });
+    ctx.textBaseline="alphabetic";
+    y+=8;
+
+    // Date pill
     ctx.fillStyle="#f0fdf4";
     ctx.strokeStyle="#bbf7d0";
     ctx.lineWidth=1;
-    ctx.beginPath(); ctx.arc(logoX+18, logoY+14, 18, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle="#14532d";
-    ctx.font="800 11px 'Plus Jakarta Sans'";
-    ctx.textAlign="center"; ctx.textBaseline="middle";
-    ctx.fillText("GKE", logoX+18, logoY+15);
-    ctx.textAlign="left"; ctx.textBaseline="alphabetic";
-  }
-
-  ctx.fillStyle="#14532d";
-  ctx.font="700 11px 'Plus Jakarta Sans'";
-  ctx.fillText("GKE BUKIT HINDU", logoX+44, y+6);
-  ctx.font="600 10px 'Plus Jakarta Sans'";
-  ctx.fillStyle="#6b7280";
-  ctx.fillText("Gereja Efrata", logoX+44, y+20);
-
-  // jam + hari right aligned
-  const rightX=outerPad+cardW-padX;
-  tctx.font="700 11px 'Plus Jakarta Sans'";
-  // hari pill right most
-  ctx.fillStyle="#f3f4f6";
-  ctx.beginPath(); ctx.roundRect(rightX-hariW, y, hariW, 28, 14); ctx.fill();
-  ctx.fillStyle="#374151";
-  ctx.font="700 11px 'Plus Jakarta Sans'";
-  ctx.textAlign="center"; ctx.textBaseline="middle";
-  ctx.fillText(hariStr, rightX-hariW/2, y+14);
-  // jam pill left of hari
-  ctx.fillStyle="#dcfce7";
-  ctx.beginPath(); ctx.roundRect(rightX-hariW-8-jamW, y, jamW, 28, 14); ctx.fill();
-  ctx.fillStyle="#065f46";
-  ctx.font="700 13px 'Plus Jakarta Sans'";
-  ctx.fillText(jamStr, rightX-hariW-8-jamW/2, y+14);
-  ctx.textAlign="left"; ctx.textBaseline="alphabetic";
-
-  y+=30+18;
-
-  // title
-  ctx.fillStyle="#052e16";
-  ctx.font=`800 ${titleSize}px 'Plus Jakarta Sans'`;
-  ctx.textBaseline="top";
-  ctx.textAlign="left";
-  titleLines.forEach(ln=>{
-    ctx.fillText(ln.trim(), outerPad+padX, y);
-    y+=titleLH;
-  });
-  ctx.textBaseline="alphabetic";
-  y+=16;
-
-  // date pill - like exa.png but more compact
-  ctx.fillStyle="#ecfdf5";
-  ctx.strokeStyle="#a7f3d0";
-  ctx.lineWidth=1;
-  ctx.beginPath(); ctx.roundRect(outerPad+padX, y, dateW, dateH, 12); ctx.fill(); ctx.stroke();
-  ctx.fillStyle="#065f46";
-  ctx.font="600 13px 'Plus Jakarta Sans'";
-  ctx.fillText(`📅 ${dateLong}`, outerPad+padX+14, y+23);
-  y+=dateH+20;
-
-  // lokasi - WHITE bg + bottom divider abu only
-  const locY=y;
-  ctx.fillStyle="#FFFFFF";
-  ctx.beginPath(); ctx.roundRect(outerPad+padX, y, maxTitleW, lokBoxH, 12); ctx.fill();
-  // bottom divider only
-  ctx.fillStyle="#e5e7eb";
-  ctx.fillRect(outerPad+padX+16, locY+lokBoxH-1, maxTitleW-32, 1);
-
-  ctx.textBaseline="top";
-  ctx.textAlign="left";
-  let ly=y+16;
-  ctx.fillStyle="#111827";
-  ctx.font="700 14px 'Plus Jakarta Sans'";
-  lokLines.forEach(ln=>{ ctx.fillText(ln.trim(), outerPad+padX+16, ly); ly+=20; });
-  if(almLines.length){
-    ly+=6;
-    ctx.fillStyle="#6b7280";
-    ctx.font="400 11.5px 'Plus Jakarta Sans'";
-    almLines.forEach(ln=>{ ctx.fillText(ln.trim(), outerPad+padX+16, ly); ly+=15; });
-  }
-  ctx.textBaseline="alphabetic";
-  y=locY+lokBoxH+20;
-
-  // petugas - bullet RAPI, rata kiri, baseline top
-  if(petugasList.length){
-    const petContainerH=12+10+petH+16;
-    ctx.fillStyle="#fafaf9";
-    ctx.beginPath(); ctx.roundRect(outerPad+padX, y, maxTitleW, petContainerH, 12); ctx.fill();
-
+    ctx.beginPath(); ctx.roundRect(outerPad+padX, y, dateW, dateH, 14); ctx.fill(); ctx.stroke();
     ctx.fillStyle="#065f46";
-    ctx.font="700 10px 'Plus Jakarta Sans'";
+    ctx.font="600 12px 'Plus Jakarta Sans'";
+    ctx.fillText(`📅 ${dateLong}`, outerPad+padX+11, y+18);
+    y+=dateH+10;
+
+    // Lokasi - tulisan besar
+    const locY=y;
+    ctx.fillStyle="#f9fafb";
+    ctx.strokeStyle="#f3f4f6";
+    ctx.lineWidth=1;
+    ctx.beginPath(); ctx.roundRect(outerPad+padX, y, maxTitleW, lokBoxH, 10); ctx.fill(); ctx.stroke();
+
+    let ly=y+12;
+    ctx.fillStyle="#111827";
+    ctx.font="700 14px 'Plus Jakarta Sans'";
     ctx.textBaseline="top";
-    ctx.textAlign="left";
-    ctx.fillText("PETUGAS PELAYANAN", outerPad+padX+16, y+14);
+    lokLines.forEach(ln=>{
+      ctx.fillText(ln.trim(), outerPad+padX+12, ly);
+      ly+=19;
+    });
+    if(almLines.length){
+      ly+=3;
+      ctx.fillStyle="#6b7280";
+      ctx.font="400 11px 'Plus Jakarta Sans'";
+      almLines.forEach(ln=>{
+        ctx.fillText(ln.trim(), outerPad+padX+12, ly);
+        ly+=14;
+      });
+    }
+    ctx.textBaseline="alphabetic";
+    y=locY+lokBoxH+10;
 
-    let py=y+14+12+10;
-    const bulletX=outerPad+padX+20;
-    const textX=outerPad+padX+34;
+    // Petugas - BULLET SEJAJAR SEMPURNA + TULISAN MAKSIMAL
+    if(petugasList.length){
+      ctx.fillStyle="#f3f4f6";
+      ctx.fillRect(outerPad+padX, y, maxTitleW, 1);
+      y+=8;
+      ctx.fillStyle="#6b7280";
+      ctx.font="700 9px 'Plus Jakarta Sans'";
+      ctx.fillText("PETUGAS PELAYANAN", outerPad+padX, y);
+      y+=12;
 
-    petWrapped.forEach((ls, idx)=>{
-      // bullet bulat rapi, center vertikal baris pertama (font 13px -> center 6.5px)
-      ctx.fillStyle="#16a34a";
-      ctx.beginPath();
-      ctx.arc(bulletX, py+7, 3.8, 0, Math.PI*2);
-      ctx.fill();
+      let py=y;
+      const bulletX = outerPad+padX+7;
+      const textX = outerPad+padX+26; // jarak bullet ke teks 19px - lega
 
-      const item=petugasList[idx];
-      const colon=item.indexOf(':');
-      if(colon>0 && colon<30){
-        const role=item.slice(0,colon+1).trim();
-        const rest=ls[0]? ls[0].slice(colon+1).trim():"";
-        ctx.fillStyle="#065f46";
-        ctx.font="700 13px 'Plus Jakarta Sans'";
-        const rw=ctx.measureText(role+' ').width;
-        ctx.fillText(role, textX, py);
-        ctx.fillStyle="#1f2937";
-        ctx.font="400 13px 'Plus Jakarta Sans'";
-        if(rest) ctx.fillText(rest, textX+rw, py);
-        py+=20;
-        for(let i=1;i<ls.length;i++){
-          ctx.fillText(ls[i].trim(), textX, py);
-          py+=20;
-        }
-      }else{
-        ctx.fillStyle="#1f2937";
-        ctx.font="400 13px 'Plus Jakarta Sans'";
-        ls.forEach(l=>{
-          ctx.fillText(l.trim(), textX, py);
+      // SET textBaseline middle untuk bullet & teks SEJAJAR SEMPURNA
+      ctx.textBaseline="middle";
+      petWrapped.forEach((ls, idx)=>{
+        ls.forEach((line, lineIdx)=>{
+          const lineY = py + 10; // center line 20px tinggi
+          
+          // Bullet hanya di baris pertama setiap petugas
+          if(lineIdx===0){
+            ctx.fillStyle="#16a34a";
+            ctx.beginPath();
+            ctx.arc(bulletX, lineY, 5, 0, Math.PI*2);
+            ctx.fill();
+          }
+
+          const item=petugasList[idx];
+          const colon=item.indexOf(':');
+          if(lineIdx===0 && colon>0 && colon<40){
+            const role=item.slice(0,colon+1).trim();
+            const rest=line.slice(colon+1).trim();
+            // Role bold
+            ctx.fillStyle="#374151";
+            ctx.font="700 13px 'Plus Jakarta Sans'";
+            ctx.textAlign="left";
+            ctx.fillText(role, textX, lineY);
+            const roleW = tctx.measureText(role).width;
+            if(rest){
+              ctx.fillStyle="#111827";
+              ctx.font="500 13px 'Plus Jakarta Sans'";
+              ctx.fillText(rest, textX+roleW+10, lineY);
+            }
+          }else{
+            // Untuk baris lanjutan atau tanpa colon
+            const txt = lineIdx===0 && colon>0 ? line.slice(colon+1).trim() : line.trim();
+            // Jika baris pertama dengan colon, sudah digambar di atas, skip
+            if(!(lineIdx===0 && colon>0)){
+              ctx.fillStyle="#111827";
+              ctx.font="500 13px 'Plus Jakarta Sans'";
+              ctx.textAlign="left";
+              if(lineIdx===0){
+                // Baris pertama tanpa colon
+                ctx.fillText(txt, textX, lineY);
+              }else{
+                // Baris lanjutan - indent
+                ctx.fillText(txt, textX, lineY);
+              }
+            }
+          }
           py+=20;
         });
-      }
-      py+=8;
-    });
-    ctx.textBaseline="alphabetic";
-    y+=petContainerH+20;
+        py+=6;
+      });
+      ctx.textBaseline="alphabetic";
+      ctx.textAlign="left";
+    }
+
+    const blob=await new Promise(r=>canvas.toBlob(r,"image/png",1.0));
+    if(!blob) throw new Error("Gagal buat blob");
+    const fileName=`Jadwal-${(ev.nama_ibadah||'Ibadah').replace(/[^a-zA-Z0-9]/g,'-')}-${ev.tanggal||''}.png`;
+    const file=new File([blob], fileName, {type:"image/png"});
+
+    let shareText = `${ev.nama_ibadah}\n${ev.hari||''} ${d?formatTanggalLong(d):ev.tanggal} jam ${formatJam(ev.jam)} WIB\n📍 ${ev.lokasi||''} ${ev.alamat? '\n'+ev.alamat : ''}`;
+    if(hasMap){
+      const mapsLink = `https://www.google.com/maps/search/?api=1&query=${ev.latitude},${ev.longitude}`;
+      shareText += `\n\n🗺️ Link Maps: ${mapsLink}`;
+    }
+    shareText += `\n\nLihat jadwal: ${location.href}`;
+
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({files:[file], title:ev.nama_ibadah, text: shareText});
+        toast("Gambar HD dibagikan ✓");
+        return;
+      }catch(e){}
+    }
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=fileName; a.style.display='none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+    toast("Gambar HD diunduh ✓");
+  }catch(err){
+    console.error("shareGambar error", err);
+    toast("Gagal: " + (err.message||err));
   }
-
-  // footer
-  ctx.fillStyle="#9ca3af";
-  ctx.font="600 9px 'Plus Jakarta Sans'";
-  ctx.textAlign="center";
-  ctx.fillText("Jangan lewatkan persekutuan terdekat • gkebukithindugerejaefrata.github.io/ibadah", W/2, canvasH-16);
-  ctx.textAlign="left";
-
-  const blob=await new Promise(r=>canvas.toBlob(r,"image/png",0.95));
-  const file=new File([blob], `Jadwal-${(ev.nama_ibadah||'Ibadah').replace(/[^a-zA-Z0-9]/g,'-')}.png`, {type:"image/png"});
-  if(navigator.canShare && navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file], title:ev.nama_ibadah}); toast("Gambar dibagikan ✓"); return; }catch(e){} }
-  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=file.name; a.click(); URL.revokeObjectURL(url); toast("Gambar diunduh ✓");
 }
+
 
 
 function adminSimpleCard(ev){
@@ -1052,7 +1057,7 @@ function onDuplicate(id){
   renderAdmin();
   $("adminFormWrap").classList.remove('hidden');
   // Fill form with duplicated data, but reset ID and set tanggal to besok or hari ini + 7 hari biar mudah
-  const tomorrow = addDaysLocal(new Date(),1);
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
   const dupDate = toLocalDateStr(tomorrow);
   // Hitung hari dari tanggal duplikat
   const dayNames = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
@@ -1202,16 +1207,10 @@ function renderTodayPopup(){
   const badgeEl = $("todayBadge");
   if(!listEl) return;
   const total = todayEvents.length + tomorrowEvents.length;
-  // Update badge - fixed for mobile absolute position
+  // Update badge
   if(badgeEl){
-    if(total>0){ 
-      badgeEl.textContent = total > 9 ? '9+' : total; 
-      badgeEl.classList.remove('hidden'); 
-      badgeEl.classList.add('flex'); 
-    } else { 
-      badgeEl.classList.add('hidden'); 
-      badgeEl.classList.remove('flex'); 
-    }
+    if(total>0){ badgeEl.textContent = total; badgeEl.classList.remove('hidden'); badgeEl.classList.add('flex'); }
+    else { badgeEl.classList.add('hidden'); badgeEl.classList.remove('flex'); }
   }
   // Update date label
   if(dateEl){
@@ -1727,6 +1726,7 @@ $("savedLocSelect")?.addEventListener('change', (e)=>{
 });
 // === NEW: Today Popup listeners ===
 $("btnTodayPopup")?.addEventListener('click', openTodayPopup);
+
 $("closeTodayPopup")?.addEventListener('click', closeTodayPopup);
 $("btnCloseTodayPopup2")?.addEventListener('click', closeTodayPopup);
 $("todayPopupBackdrop")?.addEventListener('click', closeTodayPopup);
