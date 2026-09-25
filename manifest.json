@@ -1,0 +1,23 @@
+{
+  "name": "Jadwal Ibadah GKE Bukit Hindu",
+  "short_name": "Jadwal GKE",
+  "description": "Jadwal Ibadah Digital GKE Bukit Hindu - Gereja Efrata",
+  "start_url": "/ibadah/",
+  "display": "standalone",
+  "background_color": "#F6FBF7",
+  "theme_color": "#14532d",
+  "icons": [
+    {
+      "src": "https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
