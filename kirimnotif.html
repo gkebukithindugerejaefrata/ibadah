@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kirim Notifikasi - GKE Bukit Hindu</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body{font-family:'Plus Jakarta Sans',sans-serif;background:#F6FBF7;color:#0f1c14}
+  .green-grad{background:linear-gradient(135deg,#0f5a36 0%,#157a4a 45%,#16a34a 100%)}
+</style>
+</head>
+<body class="antialiased min-h-screen flex items-center justify-center p-5">
+
+<!-- LOGIN -->
+<div id="loginBox" class="w-full max-w-[420px] p-8 rounded-[28px] bg-white border border-emerald-100 shadow-xl">
+  <div class="w-12 h-12 rounded-full green-grad text-white flex items-center justify-center font-bold text-[20px] shadow">🔔</div>
+  <h3 class="mt-5 text-[26px] font-bold leading-none">Kirim Notifikasi</h3>
+  <p class="mt-2 text-[13px] text-stone-500">Masuk untuk mengirim push notification</p>
+  <div class="mt-7 space-y-4">
+    <div>
+      <label class="text-[10px] font-bold tracking-widest text-emerald-900/60">USERNAME</label>
+      <input id="loginUser" class="mt-1 w-full h-11 px-4 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="admingereja">
+    </div>
+    <div>
+      <label class="text-[10px] font-bold tracking-widest text-emerald-900/60">PASSWORD</label>
+      <input id="loginPass" type="password" class="mt-1 w-full h-11 px-4 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="••••••••">
+    </div>
+    <button id="doLogin" class="w-full h-11 rounded-xl green-grad text-white text-[14px] font-semibold shadow hover:opacity-90 transition">Masuk</button>
+    <p id="loginErr" class="hidden text-[12px] text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2"></p>
+  </div>
+</div>
+
+<!-- FORM KIRIM NOTIF -->
+<div id="sendBox" class="hidden w-full max-w-[560px] p-8 rounded-[28px] bg-white border border-emerald-100 shadow-xl">
+  <div class="flex items-center justify-between">
+    <div>
+      <div class="w-12 h-12 rounded-full green-grad text-white flex items-center justify-center font-bold text-[20px] shadow">🔔</div>
+      <h3 class="mt-5 text-[26px] font-bold leading-none">Kirim Notifikasi</h3>
+      <p class="mt-2 text-[13px] text-stone-500">Notifikasi akan dikirim ke semua yang sudah subscribe</p>
+    </div>
+    <button id="btnLogout" class="h-9 px-4 rounded-full bg-stone-100 hover:bg-stone-200 text-[12px] font-semibold">Keluar</button>
+  </div>
+
+  <div class="mt-7 space-y-4">
+    <div>
+      <label class="text-[10px] font-bold tracking-widest text-emerald-900/60">JUDUL NOTIFIKASI *</label>
+      <input id="f_title" class="mt-1 w-full h-11 px-4 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="Contoh: Jadwal Ibadah Minggu Ini">
+    </div>
+    <div>
+      <label class="text-[10px] font-bold tracking-widest text-emerald-900/60">ISI PESAN *</label>
+      <textarea id="f_body" rows="3" class="mt-1 w-full px-4 py-3 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="Contoh: Jangan lupa ibadah hari Minggu jam 9 pagi di GKE Bukit Hindu"></textarea>
+    </div>
+    <div>
+      <label class="text-[10px] font-bold tracking-widest text-emerald-900/60">URL GAMBAR (OPSIONAL)</label>
+      <input id="f_image" class="mt-1 w-full h-11 px-4 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="https://contoh.com/gambar.jpg">
+      <p class="mt-1 text-[11px] text-stone-400">Gambar harus di-upload ke tempat lain dulu (misal Supabase Storage, imgur, dll), lalu paste link-nya di sini.</p>
+      <img id="imgPreview" class="hidden mt-2 max-h-[140px] rounded-xl border border-emerald-100 object-cover">
+    </div>
+    <div>
+      <label class="text-[10px] font-bold tracking-widest text-emerald-900/60">LINK TUJUAN SAAT DIKLIK (OPSIONAL)</label>
+      <input id="f_url" class="mt-1 w-full h-11 px-4 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="https://gkebukithindugerejaefrata.github.io/ibadah">
+      <p class="mt-1 text-[11px] text-stone-400">Kosongkan kalau ingin buka halaman utama saja.</p>
+    </div>
+
+    <button id="btnSend" class="w-full h-12 rounded-xl green-grad text-white text-[14px] font-bold shadow hover:opacity-90 transition">Kirim Sekarang</button>
+    <p id="sendResult" class="hidden text-[13px] rounded-xl px-4 py-3"></p>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://gpgjgplqsvyexumoljyo.supabase.co";
+const SUPABASE_KEY = "sb_publishable_JaVgg3CuVmI9SczGkoaRZQ_EaYoV9z9";
+const EDGE_FUNCTION_URL = SUPABASE_URL + "/functions/v1/send-push";
+
+const $ = (id) => document.getElementById(id);
+
+// ---- LOGIN ----
+function checkSession(){
+  if(localStorage.getItem("isAdminLoggedIn") === "true"){
+    $("loginBox").classList.add("hidden");
+    $("sendBox").classList.remove("hidden");
+  } else {
+    $("loginBox").classList.remove("hidden");
+    $("sendBox").classList.add("hidden");
+  }
+}
+
+$("doLogin").addEventListener("click", () => {
+  const u = $("loginUser").value.trim();
+  const p = $("loginPass").value.trim();
+  if(u === "admingereja" && p === "mimin12345."){
+    localStorage.setItem("isAdminLoggedIn", "true");
+    $("loginErr").classList.add("hidden");
+    checkSession();
+  } else {
+    $("loginErr").textContent = "Username atau password salah";
+    $("loginErr").classList.remove("hidden");
+  }
+});
+$("loginPass").addEventListener("keydown", (e) => { if(e.key === "Enter") $("doLogin").click(); });
+
+$("btnLogout").addEventListener("click", () => {
+  localStorage.removeItem("isAdminLoggedIn");
+  checkSession();
+});
+
+// ---- PREVIEW GAMBAR ----
+$("f_image").addEventListener("input", (e) => {
+  const url = e.target.value.trim();
+  if(url){
+    $("imgPreview").src = url;
+    $("imgPreview").classList.remove("hidden");
+  } else {
+    $("imgPreview").classList.add("hidden");
+  }
+});
+
+// ---- KIRIM NOTIF ----
+$("btnSend").addEventListener("click", async () => {
+  const title = $("f_title").value.trim();
+  const body = $("f_body").value.trim();
+  const image = $("f_image").value.trim();
+  const url = $("f_url").value.trim();
+  const resultEl = $("sendResult");
+
+  if(!title || !body){
+    resultEl.textContent = "Judul dan isi pesan wajib diisi.";
+    resultEl.className = "text-[13px] rounded-xl px-4 py-3 bg-amber-50 border border-amber-200 text-amber-700";
+    resultEl.classList.remove("hidden");
+    return;
+  }
+
+  $("btnSend").disabled = true;
+  $("btnSend").textContent = "Mengirim...";
+
+  try {
+    const res = await fetch(EDGE_FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + SUPABASE_KEY,
+      },
+      body: JSON.stringify({ title, body, image: image || undefined, url: url || "/" }),
+    });
+    const data = await res.json();
+
+    if(res.ok){
+      resultEl.textContent = `Berhasil dikirim ke ${data.sent} penerima. (Gagal: ${data.failed})`;
+      resultEl.className = "text-[13px] rounded-xl px-4 py-3 bg-emerald-50 border border-emerald-200 text-emerald-700";
+    } else {
+      resultEl.textContent = "Gagal: " + (data.error || "terjadi kesalahan");
+      resultEl.className = "text-[13px] rounded-xl px-4 py-3 bg-red-50 border border-red-200 text-red-700";
+    }
+  } catch (err) {
+    resultEl.textContent = "Gagal mengirim: " + err.message;
+    resultEl.className = "text-[13px] rounded-xl px-4 py-3 bg-red-50 border border-red-200 text-red-700";
+  }
+
+  resultEl.classList.remove("hidden");
+  $("btnSend").disabled = false;
+  $("btnSend").textContent = "Kirim Sekarang";
+});
+
+checkSession();
+</script>
+</body>
+</html>
