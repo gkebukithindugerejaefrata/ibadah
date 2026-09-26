@@ -58,7 +58,76 @@ async function initPushNotifications(userId) {
   } else {
     console.log('Berhasil subscribe push notification.');
   }
+
+  updateNotifButtonUI(true);
 }
 
-// Contoh pemanggilan:
-// initPushNotifications(currentUser?.id ?? null);
+// Matikan notifikasi: unsubscribe dari browser + hapus dari Supabase
+async function unsubscribePushNotifications() {
+  if (!('serviceWorker' in navigator)) return;
+
+  const registration = await navigator.serviceWorker.getRegistration('sw.js');
+  if (!registration) { updateNotifButtonUI(false); return; }
+
+  const subscription = await registration.pushManager.getSubscription();
+  if (!subscription) { updateNotifButtonUI(false); return; }
+
+  const endpoint = subscription.endpoint;
+
+  try {
+    await subscription.unsubscribe();
+  } catch (e) {
+    console.error('Gagal unsubscribe dari browser:', e);
+  }
+
+  const { error } = await supabaseClient.from('push_subscriptions').delete().eq('endpoint', endpoint);
+  if (error) console.error('Gagal hapus subscription dari database:', error);
+
+  updateNotifButtonUI(false);
+}
+
+// Cek status subscription saat halaman dibuka, sesuaikan tampilan tombol
+async function checkNotifStatus() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+  try {
+    const registration = await navigator.serviceWorker.getRegistration('sw.js');
+    if (!registration) { updateNotifButtonUI(false); return; }
+
+    const subscription = await registration.pushManager.getSubscription();
+    updateNotifButtonUI(!!subscription && Notification.permission === 'granted');
+  } catch (e) {
+    updateNotifButtonUI(false);
+  }
+}
+
+// Ubah tampilan switch sesuai status aktif/tidak
+function updateNotifButtonUI(isActive) {
+  const btn = document.getElementById('btn-aktifkan-notif');
+  if (!btn) return;
+  const thumb = btn.querySelector('.notif-thumb');
+
+  btn.dataset.active = isActive ? 'true' : 'false';
+  btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+
+  if (isActive) {
+    btn.classList.remove('bg-stone-300');
+    btn.classList.add('bg-emerald-600');
+    if (thumb) { thumb.classList.remove('translate-x-1'); thumb.classList.add('translate-x-6'); }
+  } else {
+    btn.classList.remove('bg-emerald-600');
+    btn.classList.add('bg-stone-300');
+    if (thumb) { thumb.classList.remove('translate-x-6'); thumb.classList.add('translate-x-1'); }
+  }
+}
+
+// Toggle: kalau sedang aktif -> matikan, kalau belum -> aktifkan
+async function toggleNotifikasi(userId) {
+  const btn = document.getElementById('btn-aktifkan-notif');
+  const isActive = btn?.dataset.active === 'true';
+  if (isActive) {
+    await unsubscribePushNotifications();
+  } else {
+    await initPushNotifications(userId ?? null);
+  }
+}
