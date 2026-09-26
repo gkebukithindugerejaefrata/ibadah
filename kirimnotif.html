@@ -6,16 +6,18 @@
 <title>Kirim Notifikasi - GKE Bukit Hindu</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="manifest" href="manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   body{font-family:'Plus Jakarta Sans',sans-serif;background:#F6FBF7;color:#0f1c14}
   .green-grad{background:linear-gradient(135deg,#0f5a36 0%,#157a4a 45%,#16a34a 100%)}
+  .tab-active{background:#0f5a36;color:#fff}
 </style>
 </head>
-<body class="antialiased min-h-screen flex items-center justify-center p-5">
+<body class="antialiased min-h-screen flex items-start justify-center p-5">
 
 <!-- LOGIN -->
-<div id="loginBox" class="w-full max-w-[420px] p-8 rounded-[28px] bg-white border border-emerald-100 shadow-xl">
+<div id="loginBox" class="mt-16 w-full max-w-[420px] p-8 rounded-[28px] bg-white border border-emerald-100 shadow-xl">
   <div class="w-12 h-12 rounded-full green-grad text-white flex items-center justify-center font-bold text-[20px] shadow">🔔</div>
   <h3 class="mt-5 text-[26px] font-bold leading-none">Kirim Notifikasi</h3>
   <p class="mt-2 text-[13px] text-stone-500">Masuk untuk mengirim push notification</p>
@@ -34,39 +36,73 @@
 </div>
 
 <!-- FORM KIRIM NOTIF -->
-<div id="sendBox" class="hidden w-full max-w-[560px] p-8 rounded-[28px] bg-white border border-emerald-100 shadow-xl">
-  <div class="flex items-center justify-between">
+<div id="sendBox" class="hidden w-full max-w-[560px] mt-8 mb-16 space-y-5">
+
+  <!-- STATISTIK SUBSCRIBER -->
+  <div class="p-6 rounded-[24px] green-grad text-white shadow-xl flex items-center justify-between">
     <div>
-      <div class="w-12 h-12 rounded-full green-grad text-white flex items-center justify-center font-bold text-[20px] shadow">🔔</div>
-      <h3 class="mt-5 text-[26px] font-bold leading-none">Kirim Notifikasi</h3>
-      <p class="mt-2 text-[13px] text-stone-500">Notifikasi akan dikirim ke semua yang sudah subscribe</p>
+      <p class="text-[12px] text-white/70 font-medium">Total Subscriber Aktif</p>
+      <p id="statSubscriberCount" class="mt-1 text-[32px] font-bold leading-none">–</p>
     </div>
-    <button id="btnLogout" class="h-9 px-4 rounded-full bg-stone-100 hover:bg-stone-200 text-[12px] font-semibold">Keluar</button>
+    <div class="w-14 h-14 rounded-full bg-white/15 flex items-center justify-center text-[26px]">🔔</div>
   </div>
 
-  <div class="mt-7 space-y-4">
-    <div>
-      <label class="text-[10px] font-bold tracking-widest text-emerald-900/60">JUDUL NOTIFIKASI *</label>
-      <input id="f_title" class="mt-1 w-full h-11 px-4 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="Contoh: Jadwal Ibadah Minggu Ini">
-    </div>
-    <div>
-      <label class="text-[10px] font-bold tracking-widest text-emerald-900/60">ISI PESAN *</label>
-      <textarea id="f_body" rows="3" class="mt-1 w-full px-4 py-3 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="Contoh: Jangan lupa ibadah hari Minggu jam 9 pagi di GKE Bukit Hindu"></textarea>
-    </div>
-    <div>
-      <label class="text-[10px] font-bold tracking-widest text-emerald-900/60">URL GAMBAR (OPSIONAL)</label>
-      <input id="f_image" class="mt-1 w-full h-11 px-4 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="https://contoh.com/gambar.jpg">
-      <p class="mt-1 text-[11px] text-stone-400">Gambar harus di-upload ke tempat lain dulu (misal Supabase Storage, imgur, dll), lalu paste link-nya di sini.</p>
-      <img id="imgPreview" class="hidden mt-2 max-h-[140px] rounded-xl border border-emerald-100 object-cover">
-    </div>
-    <div>
-      <label class="text-[10px] font-bold tracking-widest text-emerald-900/60">LINK TUJUAN SAAT DIKLIK (OPSIONAL)</label>
-      <input id="f_url" class="mt-1 w-full h-11 px-4 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="https://gkebukithindugerejaefrata.github.io/ibadah">
-      <p class="mt-1 text-[11px] text-stone-400">Kosongkan kalau ingin buka halaman utama saja.</p>
+  <div class="p-8 rounded-[28px] bg-white border border-emerald-100 shadow-xl">
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="w-12 h-12 rounded-full green-grad text-white flex items-center justify-center font-bold text-[20px] shadow">🔔</div>
+        <h3 class="mt-5 text-[26px] font-bold leading-none">Kirim Notifikasi</h3>
+        <p class="mt-2 text-[13px] text-stone-500">Ke semua yang sudah subscribe</p>
+      </div>
+      <button id="btnLogout" class="h-9 px-4 rounded-full bg-stone-100 hover:bg-stone-200 text-[12px] font-semibold">Keluar</button>
     </div>
 
-    <button id="btnSend" class="w-full h-12 rounded-xl green-grad text-white text-[14px] font-bold shadow hover:opacity-90 transition">Kirim Sekarang</button>
-    <p id="sendResult" class="hidden text-[13px] rounded-xl px-4 py-3"></p>
+    <!-- TAB: Kirim Sekarang / Jadwalkan -->
+    <div class="mt-6 flex gap-2 p-1 bg-stone-100 rounded-full">
+      <button id="tabNow" class="flex-1 h-10 rounded-full text-[13px] font-semibold tab-active transition">Kirim Sekarang</button>
+      <button id="tabSchedule" class="flex-1 h-10 rounded-full text-[13px] font-semibold transition">Jadwalkan</button>
+    </div>
+
+    <div class="mt-6 space-y-4">
+      <div>
+        <label class="text-[10px] font-bold tracking-widest text-emerald-900/60">JUDUL NOTIFIKASI *</label>
+        <input id="f_title" class="mt-1 w-full h-11 px-4 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="Contoh: Jadwal Ibadah Minggu Ini">
+      </div>
+      <div>
+        <label class="text-[10px] font-bold tracking-widest text-emerald-900/60">ISI PESAN *</label>
+        <textarea id="f_body" rows="3" class="mt-1 w-full px-4 py-3 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="Contoh: Jangan lupa ibadah hari Minggu jam 9 pagi di GKE Bukit Hindu"></textarea>
+      </div>
+      <div>
+        <label class="text-[10px] font-bold tracking-widest text-emerald-900/60">URL GAMBAR (OPSIONAL)</label>
+        <input id="f_image" class="mt-1 w-full h-11 px-4 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="https://contoh.com/gambar.jpg">
+        <p class="mt-1 text-[11px] text-stone-400">Gambar harus di-upload ke tempat lain dulu (misal Supabase Storage, imgur, dll), lalu paste link-nya di sini.</p>
+        <img id="imgPreview" class="hidden mt-2 max-h-[140px] rounded-xl border border-emerald-100 object-cover">
+      </div>
+      <div>
+        <label class="text-[10px] font-bold tracking-widest text-emerald-900/60">LINK TUJUAN SAAT DIKLIK (OPSIONAL)</label>
+        <input id="f_url" class="mt-1 w-full h-11 px-4 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="https://gkebukithindugerejaefrata.github.io/ibadah">
+        <p class="mt-1 text-[11px] text-stone-400">Kosongkan untuk otomatis pakai https://gkebukithindugerejaefrata.github.io/ibadah</p>
+      </div>
+
+      <!-- Field jadwal, cuma muncul kalau tab "Jadwalkan" aktif -->
+      <div id="scheduleField" class="hidden">
+        <label class="text-[10px] font-bold tracking-widest text-emerald-900/60">KIRIM PADA *</label>
+        <input id="f_sendAt" type="datetime-local" class="mt-1 w-full h-11 px-4 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700">
+        <p class="mt-1 text-[11px] text-stone-400">Waktu lokal kamu (WIB). Sistem pengecek jadwal jalan tiap ±5-15 menit, jadi bisa meleset sedikit dari waktu persis.</p>
+      </div>
+
+      <button id="btnSend" class="w-full h-12 rounded-xl green-grad text-white text-[14px] font-bold shadow hover:opacity-90 transition">Kirim Sekarang</button>
+      <p id="sendResult" class="hidden text-[13px] rounded-xl px-4 py-3"></p>
+    </div>
+  </div>
+
+  <!-- DAFTAR JADWAL TERTUNDA -->
+  <div class="p-8 rounded-[28px] bg-white border border-emerald-100 shadow-xl">
+    <h3 class="text-[18px] font-bold">Notifikasi Terjadwal</h3>
+    <p class="mt-1 text-[12px] text-stone-500">Belum terkirim, menunggu waktunya</p>
+    <div id="scheduledList" class="mt-4 space-y-3">
+      <p class="text-[13px] text-stone-400">Memuat...</p>
+    </div>
   </div>
 </div>
 
@@ -75,13 +111,19 @@ const SUPABASE_URL = "https://gpgjgplqsvyexumoljyo.supabase.co";
 const SUPABASE_KEY = "sb_publishable_JaVgg3CuVmI9SczGkoaRZQ_EaYoV9z9";
 const EDGE_FUNCTION_URL = SUPABASE_URL + "/functions/v1/send-push";
 
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const DEFAULT_URL = "https://gkebukithindugerejaefrata.github.io/ibadah";
 const $ = (id) => document.getElementById(id);
+
+let mode = "now"; // "now" atau "schedule"
 
 // ---- LOGIN ----
 function checkSession(){
   if(localStorage.getItem("isAdminLoggedIn") === "true"){
     $("loginBox").classList.add("hidden");
     $("sendBox").classList.remove("hidden");
+    loadScheduledList();
+    loadSubscriberCount();
   } else {
     $("loginBox").classList.remove("hidden");
     $("sendBox").classList.add("hidden");
@@ -107,6 +149,22 @@ $("btnLogout").addEventListener("click", () => {
   checkSession();
 });
 
+// ---- TAB SWITCH ----
+$("tabNow").addEventListener("click", () => {
+  mode = "now";
+  $("tabNow").classList.add("tab-active");
+  $("tabSchedule").classList.remove("tab-active");
+  $("scheduleField").classList.add("hidden");
+  $("btnSend").textContent = "Kirim Sekarang";
+});
+$("tabSchedule").addEventListener("click", () => {
+  mode = "schedule";
+  $("tabSchedule").classList.add("tab-active");
+  $("tabNow").classList.remove("tab-active");
+  $("scheduleField").classList.remove("hidden");
+  $("btnSend").textContent = "Jadwalkan Notifikasi";
+});
+
 // ---- PREVIEW GAMBAR ----
 $("f_image").addEventListener("input", (e) => {
   const url = e.target.value.trim();
@@ -118,51 +176,139 @@ $("f_image").addEventListener("input", (e) => {
   }
 });
 
-// ---- KIRIM NOTIF ----
+// ---- KIRIM / JADWALKAN ----
 $("btnSend").addEventListener("click", async () => {
   const title = $("f_title").value.trim();
   const body = $("f_body").value.trim();
   const image = $("f_image").value.trim();
   const url = $("f_url").value.trim();
-  const resultEl = $("sendResult");
 
   if(!title || !body){
-    resultEl.textContent = "Judul dan isi pesan wajib diisi.";
-    resultEl.className = "text-[13px] rounded-xl px-4 py-3 bg-amber-50 border border-amber-200 text-amber-700";
-    resultEl.classList.remove("hidden");
+    showResult("Judul dan isi pesan wajib diisi.", "amber");
+    return;
+  }
+  if(mode === "schedule" && !$("f_sendAt").value){
+    showResult("Waktu kirim wajib diisi untuk jadwal.", "amber");
     return;
   }
 
   $("btnSend").disabled = true;
-  $("btnSend").textContent = "Mengirim...";
+  $("btnSend").textContent = mode === "now" ? "Mengirim..." : "Menjadwalkan...";
 
   try {
-    const res = await fetch(EDGE_FUNCTION_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + SUPABASE_KEY,
-      },
-      body: JSON.stringify({ title, body, image: image || undefined, url: url || "/" }),
-    });
-    const data = await res.json();
-
-    if(res.ok){
-      resultEl.textContent = `Berhasil dikirim ke ${data.sent} penerima. (Gagal: ${data.failed})`;
-      resultEl.className = "text-[13px] rounded-xl px-4 py-3 bg-emerald-50 border border-emerald-200 text-emerald-700";
+    if(mode === "now"){
+      const res = await fetch(EDGE_FUNCTION_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SUPABASE_KEY },
+        body: JSON.stringify({ title, body, image: image || undefined, url: url || DEFAULT_URL }),
+      });
+      const data = await res.json();
+      if(res.ok){
+        showResult(`Berhasil dikirim ke ${data.sent} penerima. (Gagal: ${data.failed})`, "emerald");
+        loadSubscriberCount();
+      } else {
+        showResult("Gagal: " + (data.error || "terjadi kesalahan"), "red");
+      }
     } else {
-      resultEl.textContent = "Gagal: " + (data.error || "terjadi kesalahan");
-      resultEl.className = "text-[13px] rounded-xl px-4 py-3 bg-red-50 border border-red-200 text-red-700";
+      // Jadwalkan: simpan ke tabel, biar Edge Function cron yang kirim nanti
+      const sendAtLocal = $("f_sendAt").value; // format: YYYY-MM-DDTHH:mm (waktu lokal WIB)
+      const sendAtISO = new Date(sendAtLocal + ":00+07:00").toISOString();
+
+      const { error } = await supabaseClient.from("scheduled_notifications").insert({
+        title, body, image: image || null, url: url || DEFAULT_URL, send_at: sendAtISO,
+      });
+
+      if(error){
+        showResult("Gagal menjadwalkan: " + error.message, "red");
+      } else {
+        showResult("Notifikasi berhasil dijadwalkan.", "emerald");
+        $("f_sendAt").value = "";
+        loadScheduledList();
+      }
     }
   } catch (err) {
-    resultEl.textContent = "Gagal mengirim: " + err.message;
-    resultEl.className = "text-[13px] rounded-xl px-4 py-3 bg-red-50 border border-red-200 text-red-700";
+    showResult("Gagal: " + err.message, "red");
   }
 
-  resultEl.classList.remove("hidden");
   $("btnSend").disabled = false;
-  $("btnSend").textContent = "Kirim Sekarang";
+  $("btnSend").textContent = mode === "now" ? "Kirim Sekarang" : "Jadwalkan Notifikasi";
 });
+
+function showResult(text, color){
+  const resultEl = $("sendResult");
+  const colors = {
+    emerald: "bg-emerald-50 border-emerald-200 text-emerald-700",
+    amber: "bg-amber-50 border-amber-200 text-amber-700",
+    red: "bg-red-50 border-red-200 text-red-700",
+  };
+  resultEl.textContent = text;
+  resultEl.className = "text-[13px] rounded-xl px-4 py-3 border " + colors[color];
+  resultEl.classList.remove("hidden");
+}
+
+// ---- DAFTAR JADWAL TERTUNDA ----
+async function loadScheduledList(){
+  const listEl = $("scheduledList");
+  const { data, error } = await supabaseClient
+    .from("scheduled_notifications")
+    .select("*")
+    .eq("sent", false)
+    .order("send_at", { ascending: true });
+
+  if(error){
+    listEl.innerHTML = `<p class="text-[13px] text-red-600">Gagal memuat: ${error.message}</p>`;
+    return;
+  }
+  if(!data || data.length === 0){
+    listEl.innerHTML = `<p class="text-[13px] text-stone-400">Belum ada notifikasi yang dijadwalkan.</p>`;
+    return;
+  }
+
+  listEl.innerHTML = data.map((n) => {
+    const waktu = new Date(n.send_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" });
+    return `
+      <div class="p-4 rounded-xl border border-emerald-100 bg-emerald-50/40 flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <div class="font-semibold text-[14px] truncate">${escapeHtml(n.title)}</div>
+          <div class="text-[12px] text-stone-500 truncate">${escapeHtml(n.body)}</div>
+          <div class="mt-1 text-[11px] font-semibold text-emerald-700">🕐 ${waktu} WIB</div>
+        </div>
+        <button data-id="${n.id}" class="btnCancel shrink-0 h-8 px-3 rounded-full bg-red-50 hover:bg-red-100 text-red-600 text-[11px] font-semibold">Batalkan</button>
+      </div>
+    `;
+  }).join("");
+
+  document.querySelectorAll(".btnCancel").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if(!confirm("Batalkan notifikasi terjadwal ini?")) return;
+      const id = btn.dataset.id;
+      const { error } = await supabaseClient.from("scheduled_notifications").delete().eq("id", id);
+      if(error){ alert("Gagal membatalkan: " + error.message); return; }
+      loadScheduledList();
+    });
+  });
+}
+
+// ---- STATISTIK SUBSCRIBER ----
+async function loadSubscriberCount(){
+  const el = $("statSubscriberCount");
+  const { count, error } = await supabaseClient
+    .from("push_subscriptions")
+    .select("*", { count: "exact", head: true });
+
+  if(error){
+    el.textContent = "—";
+    console.error("Gagal memuat jumlah subscriber:", error);
+    return;
+  }
+  el.textContent = count ?? 0;
+}
+
+function escapeHtml(str){
+  const div = document.createElement("div");
+  div.textContent = str || "";
+  return div.innerHTML;
+}
 
 checkSession();
 </script>
