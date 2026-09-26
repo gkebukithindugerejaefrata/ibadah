@@ -46,9 +46,12 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#F6FBF7;color:#0f1c14
       </div>
     </div>
     <div class="flex items-center gap-2">
-      <button id="btn-aktifkan-notif" title="Aktifkan notifikasi push" class="h-10 w-10 sm:w-auto sm:h-10 sm:px-4 rounded-full bg-white border border-emerald-200 text-emerald-900 hover:bg-emerald-50 transition flex items-center justify-center gap-1.5 shadow-sm shrink-0">
-        <span class="text-[18px] leading-none">🔔</span><span class="hidden sm:inline text-[13px] font-semibold">Notifikasi</span>
-      </button>
+      <div id="notifWrap" title="Notifikasi push" class="h-10 pl-3.5 pr-1.5 rounded-full bg-white border border-emerald-200 shadow-sm shrink-0 flex items-center gap-2">
+        <span class="hidden sm:inline text-[13px] font-semibold text-emerald-900">🔔 Notifikasi</span>
+        <button id="btn-aktifkan-notif" role="switch" aria-checked="false" data-active="false" class="relative inline-flex h-6 w-11 items-center rounded-full bg-stone-300 transition-colors duration-200 shrink-0">
+          <span class="notif-thumb pointer-events-none inline-block h-4 w-4 translate-x-1 rounded-full bg-white shadow transition-transform duration-200"></span>
+        </button>
+      </div>
       <button id="btnTodayPopup" title="Lihat jadwal hari ini & besok" class="relative h-10 w-10 sm:w-auto sm:h-10 sm:px-4 rounded-full bg-white border border-emerald-200 text-emerald-900 hover:bg-emerald-50 transition flex items-center justify-center gap-1.5 shadow-sm shrink-0">
         <span class="text-[18px] leading-none">📅</span><span class="hidden sm:inline text-[13px] font-semibold">Hari Ini</span><span id="todayBadge" class="hidden absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] px-1 rounded-full bg-red-600 text-white text-[11px] font-bold items-center justify-center border-2 border-white shadow leading-none"></span>
       </button>
@@ -623,7 +626,7 @@ function openPopup(ev){
   $("btnShare")?.addEventListener('click',()=>shareIbadah(ev));
   $("btnShareImg")?.addEventListener('click',()=>shareGambar(ev));
 }
-function closePopup(){ $("popup").classList.add('hidden'); document.body.style.overflow=''; if(mapInstance){ mapInstance.remove(); mapInstance=null; } }
+function closePopup(){ $("popup").classList.add('hidden'); document.body.style.overflow=''; if(mapInstance){ mapInstance.remove(); mapInstance=null; } if(location.hash.startsWith('#ibadah=')){ history.replaceState(null,'',location.pathname+location.search); } }
 
 async function shareIbadah(ev){
   const d=parseDateStr(ev.tanggal);
@@ -1651,6 +1654,7 @@ async function fetchEvents(){
 function render(){
   const hash=location.hash||"";
   const isAdminRoute=hash.startsWith("#admin");
+  const ibadahMatch=hash.match(/^#ibadah=(.+)$/);
   const content=$("content"), loading=$("loading"), empty=$("emptyState"), adminPage=$("adminPage");
   const hero=$("heroSection"), tabs=$("tabsSection"), publicPag=$("publicPagination");
   const isLogged=localStorage.getItem("isAdminLoggedIn")==="true";
@@ -1675,6 +1679,9 @@ function render(){
     if(tabs) tabs.classList.remove('hidden');
     if(publicPag) publicPag.classList.remove('hidden');
     renderAll();
+    if(ibadahMatch && allEvents.length>0){
+      openPopupById(ibadahMatch[1]);
+    }
   }
   const adminStatus=$("adminStatus");
   if(adminStatus){
@@ -1855,9 +1862,14 @@ window.openPopupById=openPopupById; window.onEdit=onEdit; window.onDelete=onDele
     });
   }
 
-  // Panggil ini saat user klik tombol "Aktifkan Notifikasi"
+  // Tombol notif sekarang berfungsi sebagai toggle: aktifkan / matikan
   document.getElementById('btn-aktifkan-notif').addEventListener('click', () => {
-    initPushNotifications(null); // null karena belum pakai auth, nanti bisa diganti user id
+    toggleNotifikasi(null); // null karena belum pakai auth, nanti bisa diganti user id
+  });
+
+  // Cek status subscription saat halaman pertama dibuka, sesuaikan tampilan tombol
+  window.addEventListener('load', () => {
+    checkNotifStatus();
   });
 </script>
 </body>
