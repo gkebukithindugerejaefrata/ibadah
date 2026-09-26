@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14532d">
+<link rel="apple-touch-icon" href="https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png">
 <title>JADWAL IBADAH DIGITAL - GKE Bukit Hindu, Gereja Efrata</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -1844,7 +1847,15 @@ window.openPopupById=openPopupById; window.onEdit=onEdit; window.onDelete=onDele
 </footer>
 <script src="push-subscribe.js"></script>
 <script>
-  // Panggil ini saat user klik tombol "Aktifkan Notifikasi" misalnya
+  // Daftarkan service worker segera (untuk keperluan PWA installable),
+  // terpisah dari alur "Aktifkan Notifikasi" yang minta izin push.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch((err) => {
+      console.error('Gagal mendaftarkan service worker:', err);
+    });
+  }
+
+  // Panggil ini saat user klik tombol "Aktifkan Notifikasi"
   document.getElementById('btn-aktifkan-notif').addEventListener('click', () => {
     initPushNotifications(null); // null karena belum pakai auth, nanti bisa diganti user id
   });

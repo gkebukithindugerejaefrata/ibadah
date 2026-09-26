@@ -1,8 +1,9 @@
 {
-  "name": "Jadwal Ibadah GKE Bukit Hindu",
+  "name": "Jadwal Ibadah Digital - GKE Bukit Hindu",
   "short_name": "Jadwal GKE",
-  "description": "Jadwal Ibadah Digital GKE Bukit Hindu - Gereja Efrata",
-  "start_url": "/ibadah/",
+  "description": "Jadwal Ibadah Digital Jemaat GKE Bukit Hindu, Gereja Efrata",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#F6FBF7",
   "theme_color": "#14532d",
