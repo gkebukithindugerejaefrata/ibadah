@@ -1367,7 +1367,8 @@ async function saveForm(){
     petugas:$("f_petugas").value.trim()||null,
     latitude:$("f_lat").value? parseFloat($("f_lat").value):null,
     longitude:$("f_lng").value? parseFloat($("f_lng").value):null,
-    show_map:$("f_showmap").checked
+    show_map:$("f_showmap").checked,
+    reminder_sent:false
   };
   if(!payload.nama_ibadah||!payload.lokasi||!payload.tanggal||!payload.jam){
     toast("Lengkapi field wajib: Nama, Lokasi, Tanggal, Jam");
