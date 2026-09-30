@@ -195,6 +195,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#F6FBF7;color:#0f1c14
           <div><label class="text-[10px] font-bold tracking-widest">NAMA IBADAH *</label><input id="f_nama" class="mt-1 w-full h-11 px-3 rounded-xl border border-stone-200" placeholder="IBADAH KELUARGA INTI (LP VI)"></div>
           <div class="sm:col-span-2"><label class="text-[10px] font-bold tracking-widest">LOKASI *</label><input id="f_lokasi" class="mt-1 w-full h-11 px-3 rounded-xl border border-stone-200" placeholder="Di tempat Keluarga Kartiman"></div>
           <div class="sm:col-span-2"><label class="text-[10px] font-bold tracking-widest">ALAMAT</label><textarea id="f_alamat" rows="2" class="mt-1 w-full px-3 py-2 rounded-xl border border-stone-200" placeholder="Jl. Sangga Buana II No. 71, Palangka Raya"></textarea></div>
+          <div class="sm:col-span-2"><label class="text-[10px] font-bold tracking-widest">LINK / TAUTAN (opsional)</label><input id="f_link" type="url" inputmode="url" class="mt-1 w-full h-11 px-3 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="https://zoom.us/j/... atau link YouTube / Google Meet"><div id="linkInfo" class="mt-1 text-[11px] text-stone-500">Kosongkan jika tidak ada. Link akan tampil sebagai tombol yang bisa diklik pada jadwal.</div></div>
           <div class="sm:col-span-2"><label class="text-[10px] font-bold tracking-widest">PETUGAS PELAYANAN (pisah baris baru per petugas)</label><textarea id="f_petugas" rows="5" class="mt-1 w-full px-3 py-2 rounded-xl border border-emerald-200 focus:ring-2 focus:ring-emerald-700 outline-none" placeholder="Pdt. Dermawisata J. Baen, M.Th
 Koordinator: Pnt. Katmie
 Liturgos: Dkn. Nyata Susila
@@ -325,6 +326,24 @@ function getWeekStart(d){ // Minggu awal pekan - fix: 30 Agu - 5 Sep untuk Sep 2
 function getWeekEnd(m){ const s=new Date(m); s.setDate(s.getDate()+6); return s; }
 function getMonday(d){ return getWeekStart(d); }
 function getSunday(m){ return getWeekEnd(m); }
+function normalizeLink(raw){
+  raw=(raw||'').trim();
+  if(!raw) return '';
+  if(!/^https?:\/\//i.test(raw)) raw='https://'+raw;
+  try{ const u=new URL(raw); if(!/^https?:$/.test(u.protocol) || !u.hostname.includes('.')) return null; return u.href; }
+  catch(e){ return null; }
+}
+function linkMeta(url){
+  let h=''; try{ h=new URL(url).hostname.toLowerCase(); }catch(e){}
+  if(h.includes('zoom.us')) return {icon:'🎥',label:'Gabung Zoom'};
+  if(h.includes('meet.google')) return {icon:'🎥',label:'Gabung Google Meet'};
+  if(h.includes('youtube.com')||h.includes('youtu.be')) return {icon:'▶️',label:'Tonton di YouTube'};
+  if(h.includes('facebook.com')||h.includes('fb.watch')) return {icon:'📘',label:'Buka Facebook'};
+  if(h.includes('instagram.com')) return {icon:'📷',label:'Buka Instagram'};
+  if(h.includes('wa.me')||h.includes('whatsapp.com')) return {icon:'💬',label:'Buka WhatsApp'};
+  return {icon:'🔗',label:'Buka Tautan'};
+}
+function escAttr(t){ return String(t).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function parseMapsLink(link){
   if(!link) return null;
   try{
@@ -421,6 +440,7 @@ function eventCard(ev, isAdmin=false){
       <div class="font-semibold text-[14px] text-stone-900">${ev.lokasi||''}</div>
       ${ev.alamat? `<div class="text-[12px] text-stone-500 mt-0.5">${ev.alamat}</div>`:''}
     </div>
+    ${ev.link? (()=>{const m=linkMeta(ev.link); return `<a href="${escAttr(ev.link)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="mt-3 inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full bg-emerald-900 text-white text-[12px] font-semibold hover:bg-emerald-950 transition"><span>${m.icon}</span><span>${m.label}</span></a>`;})():''}
     ${petugasList.length? `<div class="mt-4 pt-3 border-t border-stone-100"><div class="text-[10px] font-bold tracking-widest text-emerald-800/70">PETUGAS PELAYANAN</div>${renderPetugasList(ev.petugas)}</div>`:''}
     ${isAdmin? `<div class="mt-4 flex flex-wrap gap-2" onclick="event.stopPropagation()"><button onclick="onEdit('${ev.id}')" class="h-8 px-3 rounded-full bg-emerald-900 text-white text-[12px] font-medium">Edit</button><button onclick="onDuplicate('${ev.id}')" class="h-8 px-3 rounded-full bg-white border border-emerald-300 text-emerald-800 text-[12px] font-medium hover:bg-emerald-50">📋 Duplikat</button><button onclick="onDelete('${ev.id}')" class="h-8 px-3 rounded-full bg-white border border-red-200 text-red-700 text-[12px]">Hapus</button><button onclick="openPopupById('${ev.id}')" class="h-8 px-3 rounded-full bg-white border border-emerald-200 text-[12px]">Lihat</button></div>`:''}
   </div>`;
@@ -594,6 +614,7 @@ function openPopup(ev){
         ${petugasList.length? `<div class="mt-6 pt-5 border-t border-stone-200"><div class="text-[11px] font-bold tracking-widest text-emerald-800">PETUGAS PELAYANAN</div><div class="mt-3">${renderPetugasList(ev.petugas)}</div></div>`:''}
         ${(ev.show_map && ev.latitude!=null)? `<div class="mt-6"><div id="popupMap" class="map-mini border border-emerald-100"></div><div class="mt-2 text-[11px] text-stone-500">${ev.latitude.toFixed(6)}, ${ev.longitude.toFixed(6)}</div></div>`:''}
         <div class="mt-8 grid grid-cols-2 gap-2">
+          ${ev.link? (()=>{const m=linkMeta(ev.link); return `<a href="${escAttr(ev.link)}" target="_blank" rel="noopener noreferrer" class="col-span-2 h-12 rounded-[14px] bg-emerald-900 text-white flex items-center justify-center gap-2 text-[13px] font-semibold hover:bg-emerald-950 shadow"><span>${m.icon}</span><span>${m.label}</span></a>`;})():''}
           ${mapsLink? `<a href="${mapsLink}" target="_blank" class="h-12 rounded-[14px] bg-white border border-emerald-200 flex items-center justify-center gap-2 text-[13px] font-semibold hover:bg-emerald-50 text-emerald-900">🗺️ Buka Peta</a>`:`<button disabled class="h-12 rounded-[14px] bg-stone-50 border text-[13px] text-stone-400">Peta tidak tersedia</button>`}
           <button id="btnShare" class="h-12 rounded-[14px] bg-white border border-emerald-200 text-[13px] font-semibold hover:bg-emerald-50 text-emerald-900">🔗 Share</button>
           <button id="btnShareImg" class="h-12 rounded-[14px] green-grad text-white text-[13px] font-semibold col-span-2 shadow">🖼️ Share Gambar Ibadah</button>
@@ -631,7 +652,7 @@ function closePopup(){ $("popup").classList.add('hidden'); document.body.style.o
 async function shareIbadah(ev){
   const d=parseDateStr(ev.tanggal);
   const petugasText = parsePetugas(ev.petugas).join('\n- ');
-  const text=`${ev.nama_ibadah}\n${ev.hari||''} ${d? formatTanggalLong(d):''} jam ${formatJam(ev.jam)} WIB\nLokasi: ${ev.lokasi||''} ${ev.alamat||''}\n${petugasText? 'Petugas:\n- '+petugasText:''}`;
+  const text=`${ev.nama_ibadah}\n${ev.hari||''} ${d? formatTanggalLong(d):''} jam ${formatJam(ev.jam)} WIB\nLokasi: ${ev.lokasi||''} ${ev.alamat||''}\n${ev.link? 'Link: '+ev.link+'\n':''}${petugasText? 'Petugas:\n- '+petugasText:''}`;
   const url=(ev.latitude!=null)? `https://www.google.com/maps/search/?api=1&query=${ev.latitude},${ev.longitude}`:location.href;
   if(navigator.share){ try{ await navigator.share({title:ev.nama_ibadah,text,url}); toast("Dibagikan ✓"); }catch(e){} }
   else { await navigator.clipboard.writeText(text+"\n"+url); toast("Teks disalin ✓"); }
@@ -944,6 +965,7 @@ async function shareGambar(ev){
       const mapsLink = `https://www.google.com/maps/search/?api=1&query=${ev.latitude},${ev.longitude}`;
       shareText += `\n\n🗺️ Link Maps: ${mapsLink}`;
     }
+    if(ev.link) shareText += `\n\n🔗 Link: ${ev.link}`;
     shareText += `\n\nLihat jadwal: ${location.href}`;
 
     if(navigator.canShare && navigator.canShare({files:[file]})){
@@ -984,6 +1006,7 @@ function adminSimpleCard(ev){
         <div class="flex flex-wrap items-center gap-1.5 mt-1">
           <span class="text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full bg-stone-100 border border-stone-200 shrink-0">${formatJam(ev.jam)} WIB</span>
           <span class="text-[10px] sm:text-[11px] text-stone-500 truncate max-w-[140px] sm:max-w-[220px]">${ev.lokasi||''}</span>
+          ${ev.link? `<a href="${escAttr(ev.link)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="${escAttr(ev.link)}" class="text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full bg-emerald-900 text-white shrink-0">🔗 Link</a>`:''}
         </div>
       </div>
     </div>
@@ -1072,6 +1095,7 @@ function onEdit(id){
   $("f_nama").value=ev.nama_ibadah||"";
   $("f_lokasi").value=ev.lokasi||"";
   $("f_alamat").value=ev.alamat||"";
+  $("f_link").value=ev.link||"";
   $("f_petugas").value=ev.petugas||"";
   $("f_lat").value=ev.latitude??"";
   $("f_lng").value=ev.longitude??"";
@@ -1125,6 +1149,7 @@ function onDuplicate(id){
   $("f_nama").value=ev.nama_ibadah||"";
   $("f_lokasi").value=ev.lokasi||"";
   $("f_alamat").value=ev.alamat||"";
+  $("f_link").value=ev.link||"";
   $("f_petugas").value=ev.petugas||"";
   $("f_lat").value=ev.latitude!=null? ev.latitude : "";
   $("f_lng").value=ev.longitude!=null? ev.longitude : "";
@@ -1346,6 +1371,7 @@ function resetForm(){
   $("f_nama").value="";
   $("f_lokasi").value="";
   $("f_alamat").value="";
+  $("f_link").value="";
   $("f_petugas").value="";
   $("f_lat").value="";
   $("f_lng").value="";
@@ -1357,6 +1383,8 @@ function resetForm(){
 async function saveForm(){
   const btn=$("saveForm");
   const id=$("f_id").value.trim();
+  const linkNorm=normalizeLink($("f_link").value);
+  if(linkNorm===null){ toast("Format link tidak valid"); $("f_link").focus(); return; }
   const payload={
     hari:$("f_hari").value,
     tanggal:$("f_tanggal").value,
@@ -1364,6 +1392,7 @@ async function saveForm(){
     nama_ibadah:$("f_nama").value.trim(),
     lokasi:$("f_lokasi").value.trim(),
     alamat:$("f_alamat").value.trim(),
+    link:linkNorm||null,
     petugas:$("f_petugas").value.trim()||null,
     latitude:$("f_lat").value? parseFloat($("f_lat").value):null,
     longitude:$("f_lng").value? parseFloat($("f_lng").value):null,
