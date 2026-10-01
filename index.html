@@ -337,7 +337,7 @@ function linkMeta(url){
   let h=''; try{ h=new URL(url).hostname.toLowerCase(); }catch(e){}
   if(h.includes('zoom.us')) return {icon:'🎥',label:'Gabung Zoom'};
   if(h.includes('meet.google')) return {icon:'🎥',label:'Gabung Google Meet'};
-  if(h.includes('youtube.com')||h.includes('youtu.be')) return {icon:'▶️',label:'Tonton di YouTube'};
+  if(h.includes('youtube.com')||h.includes('youtu.be')) return {icon:'▶️',label:'Live Streaming'};
   if(h.includes('facebook.com')||h.includes('fb.watch')) return {icon:'📘',label:'Buka Facebook'};
   if(h.includes('instagram.com')) return {icon:'📷',label:'Buka Instagram'};
   if(h.includes('wa.me')||h.includes('whatsapp.com')) return {icon:'💬',label:'Buka WhatsApp'};
