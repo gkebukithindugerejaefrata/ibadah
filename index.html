@@ -124,8 +124,8 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#F6FBF7;color:#0f1c14
           <h3 class="mt-5 font-serif text-[30px] leading-none">Masuk Admin</h3>
           <p class="mt-2 text-[13px] text-stone-500">Masuk untuk mengelola jadwal ibadah</p>
           <div class="mt-7 space-y-4">
-            <div><label class="text-[10px] font-bold tracking-widest text-emerald-900/60">USERNAME</label><input id="loginUser" class="mt-1 w-full h-11 px-4 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="admingereja"></div>
-            <div><label class="text-[10px] font-bold tracking-widest text-emerald-900/60">PASSWORD</label><input id="loginPass" type="password" class="mt-1 w-full h-11 px-4 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="••••••••"></div>
+            <div><label class="text-[10px] font-bold tracking-widest text-emerald-900/60">EMAIL</label><input id="loginUser" type="email" autocomplete="username" inputmode="email" class="mt-1 w-full h-11 px-4 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="admin@email.com"></div>
+            <div><label class="text-[10px] font-bold tracking-widest text-emerald-900/60">PASSWORD</label><input id="loginPass" type="password" autocomplete="current-password" class="mt-1 w-full h-11 px-4 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-700" placeholder="••••••••"></div>
             <button id="doLogin" class="w-full h-11 rounded-xl green-grad text-white text-[14px] font-semibold shadow hover:opacity-90 transition">Masuk Dashboard</button>
             <p id="loginErr" class="hidden text-[12px] text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2"></p>
           </div>
@@ -287,6 +287,7 @@ const GKE_LOGO_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAEsCAYA
 const GKE_LOGO_DATA = GKE_LOGO_WEBP; // default for img tags
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let isAdminAuthed = false; // status login admin, diisi dari sesi Supabase Auth
 let allEvents = []; let selectedMonthKey = null; let selectedWeekKey = null; let searchQuery = ""; let activeTab = "upcoming"; let mapInstance = null; let popupMapToken = 0;
 let publicPage = 1; const PUBLIC_PAGE_SIZE = 9;
 let adminPageNum = 1; const ADMIN_PAGE_SIZE = 6;
@@ -1709,7 +1710,7 @@ function render(){
   const ibadahMatch=hash.match(/^#ibadah=(.+)$/);
   const content=$("content"), loading=$("loading"), empty=$("emptyState"), adminPage=$("adminPage");
   const hero=$("heroSection"), tabs=$("tabsSection"), publicPag=$("publicPagination");
-  const isLogged=localStorage.getItem("isAdminLoggedIn")==="true";
+  const isLogged=isAdminAuthed;
   if(isAdminRoute){
     if(content) content.classList.add('hidden');
     if(loading) loading.classList.add('hidden');
@@ -1743,7 +1744,7 @@ function render(){
 }
 
 function checkAdminSession(){
-  const logged=localStorage.getItem("isAdminLoggedIn")==="true";
+  const logged=isAdminAuthed;
   const loginEl=$("adminLogin"), dashEl=$("adminDashboard");
   if(!logged){
     if(loginEl) loginEl.classList.remove('hidden');
@@ -1781,24 +1782,42 @@ $("btnThisWeek").addEventListener('click',()=>{
     toast("Pekan berjalan");
   }
 });
-$("doLogin").addEventListener('click',()=>{
-  const u=$("loginUser").value.trim(), p=$("loginPass").value.trim();
-  if(u==="admingereja" && p==="mimin12345."){ localStorage.setItem("isAdminLoggedIn","true"); $("loginErr").classList.add('hidden'); checkAdminSession(); toast("Login berhasil"); }
-  else { $("loginErr").textContent="Username atau password salah"; $("loginErr").classList.remove('hidden'); }
+$("doLogin").addEventListener('click',async()=>{
+  const btn=$("doLogin"), errEl=$("loginErr");
+  const email=$("loginUser").value.trim(), password=$("loginPass").value;
+  errEl.classList.add('hidden');
+  if(!email || !password){ errEl.textContent="Email dan password wajib diisi"; errEl.classList.remove('hidden'); return; }
+  const origText=btn.textContent;
+  btn.disabled=true; btn.textContent="Memeriksa...";
+  try{
+    const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+    if(error) throw error;
+    isAdminAuthed=!!data.session;
+    $("loginPass").value="";
+    checkAdminSession();
+    render();
+    toast("Login berhasil");
+  }catch(e){
+    // Pesan sengaja dibuat umum agar tidak membocorkan apakah email terdaftar
+    const msg=/rate|too many/i.test(e.message||"") ? "Terlalu banyak percobaan, coba lagi beberapa menit lagi" : "Email atau password salah";
+    errEl.textContent=msg; errEl.classList.remove('hidden');
+  }finally{
+    btn.disabled=false; btn.textContent=origText;
+  }
 });
 $("loginUser").addEventListener('keydown',e=>{ if(e.key==="Enter"){ $("loginPass").focus(); } });
 $("loginPass").addEventListener('keydown',e=>{ if(e.key==="Enter"){ $("doLogin").click(); } });
 const closeLoginPopup=()=>{
   const loginEl=$("adminLogin");
   if(loginEl) loginEl.classList.add('hidden');
-  if(location.hash.startsWith("#admin") && localStorage.getItem("isAdminLoggedIn")!=="true"){
+  if(location.hash.startsWith("#admin") && !isAdminAuthed){
     location.hash="";
   }
 };
 $("closeLogin")?.addEventListener('click', closeLoginPopup);
 $("loginBackdrop")?.addEventListener('click', closeLoginPopup);
 
-$("btnLogout").addEventListener('click',()=>{ localStorage.removeItem("isAdminLoggedIn"); location.hash=""; render(); toast("Keluar"); });
+$("btnLogout").addEventListener('click',async()=>{ try{ await supabaseClient.auth.signOut(); }catch(e){} isAdminAuthed=false; location.hash=""; render(); toast("Keluar"); });
 $("btnRefresh").addEventListener('click',fetchEvents);
 document.querySelectorAll(".tabBtn").forEach(btn=>{
   btn.addEventListener('click',()=>{
@@ -1873,6 +1892,12 @@ document.querySelectorAll(".quickRange").forEach(btn=>{
 
 window.addEventListener('hashchange',render);
 resetForm(); fetchEvents();
+// Pulihkan sesi Supabase saat halaman dibuka & pantau perubahan (login/logout/token kedaluwarsa)
+supabaseClient.auth.getSession().then(({data})=>{ isAdminAuthed=!!(data&&data.session); render(); });
+supabaseClient.auth.onAuthStateChange((_event,session)=>{
+  const now=!!session;
+  if(now!==isAdminAuthed){ isAdminAuthed=now; setTimeout(render,0); }
+});
 // Set logo images
 document.addEventListener('DOMContentLoaded',()=>{
   const logoEls=document.querySelectorAll('#headerLogo, #footerLogo, #footerLogo2');
