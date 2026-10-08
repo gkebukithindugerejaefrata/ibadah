@@ -1189,15 +1189,41 @@ function onDuplicate(id){
 }
 
 // ========== SAVED LOCATIONS (KOORDINAT FAVORIT) ==========
-const SAVED_LOCS_KEY = "gke_saved_locs_v1";
-function loadSavedLocs(){
+const SAVED_LOCS_TABLE = "lokasi_tersimpan";
+const SAVED_LOCS_OLD_KEY = "gke_saved_locs_v1"; // hanya untuk migrasi sekali dari versi lama
+let savedLocsCache = []; let savedLocsLoaded = false;
+const escLoc = (v)=>String(v??"").replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function loadSavedLocs(){ return savedLocsCache; }
+async function fetchSavedLocs(){
+  if(!isAdminAuthed){ savedLocsCache=[]; savedLocsLoaded=false; renderSavedLocs(); return; }
+  savedLocsLoaded = true;
   try{
-    const raw = localStorage.getItem(SAVED_LOCS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  }catch(e){ return []; }
+    const {data,error}=await supabaseClient.from(SAVED_LOCS_TABLE).select("*").order("name",{ascending:true});
+    if(error) throw error;
+    savedLocsCache = data||[];
+    await migrateOldSavedLocs();
+  }catch(e){
+    savedLocsLoaded = false;
+    toast("Gagal memuat lokasi tersimpan: "+(e.message||e));
+  }
+  renderSavedLocs();
 }
-function saveSavedLocs(locs){
-  localStorage.setItem(SAVED_LOCS_KEY, JSON.stringify(locs));
+// Pindahkan data lama dari localStorage ke Supabase (sekali jalan), lalu hapus dari browser
+async function migrateOldSavedLocs(){
+  let old=[];
+  try{ old=JSON.parse(localStorage.getItem(SAVED_LOCS_OLD_KEY)||"[]"); }catch(e){ old=[]; }
+  if(!Array.isArray(old) || old.length===0){ try{ localStorage.removeItem(SAVED_LOCS_OLD_KEY); }catch(e){} return; }
+  const have=new Set(savedLocsCache.map(l=>String(l.name).toLowerCase()));
+  const rows=old.filter(l=>l && l.name && !isNaN(parseFloat(l.lat)) && !isNaN(parseFloat(l.lng)) && !have.has(String(l.name).toLowerCase()))
+    .map(l=>({name:String(l.name), lat:parseFloat(l.lat), lng:parseFloat(l.lng), nama_lokasi:l.nama_lokasi||"", alamat:l.alamat||""}));
+  if(rows.length){
+    const {error}=await supabaseClient.from(SAVED_LOCS_TABLE).insert(rows);
+    if(error) throw error;
+    const {data}=await supabaseClient.from(SAVED_LOCS_TABLE).select("*").order("name",{ascending:true});
+    savedLocsCache=data||savedLocsCache;
+    toast(`${rows.length} lokasi lama dipindahkan ke server ✓`);
+  }
+  try{ localStorage.removeItem(SAVED_LOCS_OLD_KEY); }catch(e){}
 }
 function renderSavedLocs(){
   const locs = loadSavedLocs();
@@ -1206,14 +1232,14 @@ function renderSavedLocs(){
   const listEl = $("savedLocList");
   if(!sel) return;
   // Update select
-  sel.innerHTML = '<option value="">-- Pilih lokasi tersimpan --</option>' + locs.map((l,i)=>`<option value="${i}">${l.name} • ${Number(l.lat).toFixed(5)}, ${Number(l.lng).toFixed(5)}</option>`).join('');
+  sel.innerHTML = '<option value="">-- Pilih lokasi tersimpan --</option>' + locs.map((l,i)=>`<option value="${i}">${escLoc(l.name)} • ${Number(l.lat).toFixed(5)}, ${Number(l.lng).toFixed(5)}</option>`).join('');
   if(countEl) countEl.textContent = `${locs.length} tersimpan`;
   // Render chips
   if(listEl){
     if(locs.length===0){
       listEl.innerHTML = '<span class="text-[11px] text-stone-400">Belum ada lokasi tersimpan</span>';
     }else{
-      listEl.innerHTML = locs.map((l,i)=>`<button type="button" data-idx="${i}" class="saved-chip px-2.5 py-1 rounded-full bg-white border border-emerald-200 text-[11px] hover:bg-emerald-50 transition">📍 ${l.name}</button>`).join('');
+      listEl.innerHTML = locs.map((l,i)=>`<button type="button" data-idx="${i}" class="saved-chip px-2.5 py-1 rounded-full bg-white border border-emerald-200 text-[11px] hover:bg-emerald-50 transition">📍 ${escLoc(l.name)}</button>`).join('');
       listEl.querySelectorAll('.saved-chip').forEach(btn=>{
         btn.addEventListener('click',()=>{
           const idx = parseInt(btn.dataset.idx);
@@ -1246,20 +1272,22 @@ function useSavedLoc(){
   $("mapsParseInfo").className="mt-1 text-[11px] text-emerald-700 font-semibold";
   toast(`Lokasi ${loc.name} dipakai ✓`);
 }
-function deleteSavedLoc(){
+async function deleteSavedLoc(){
   const sel = $("savedLocSelect");
   if(!sel || sel.value===""){ toast("Pilih lokasi yang akan dihapus"); return; }
-  const idx = parseInt(sel.value);
   const locs = loadSavedLocs();
-  if(!locs[idx]) return;
-  if(!confirm(`Hapus lokasi tersimpan "${locs[idx].name}"?`)) return;
-  locs.splice(idx,1);
-  saveSavedLocs(locs);
-  renderSavedLocs();
-  sel.value="";
-  toast("Lokasi dihapus ✓");
+  const loc = locs[parseInt(sel.value)];
+  if(!loc) return;
+  if(!confirm(`Hapus lokasi tersimpan "${loc.name}"?`)) return;
+  try{
+    const {error}=await supabaseClient.from(SAVED_LOCS_TABLE).delete().eq("id",loc.id);
+    if(error) throw error;
+    await fetchSavedLocs();
+    sel.value="";
+    toast("Lokasi dihapus ✓");
+  }catch(e){ toast("Gagal hapus lokasi: "+(e.message||e)); }
 }
-function saveCurrentLoc(){
+async function saveCurrentLoc(){
   const lat = $("f_lat").value.trim();
   const lng = $("f_lng").value.trim();
   const nameInput = $("newSavedLocName").value.trim();
@@ -1272,21 +1300,20 @@ function saveCurrentLoc(){
   const latNum = parseFloat(lat), lngNum = parseFloat(lng);
   if(isNaN(latNum) || isNaN(lngNum)){ toast("Koordinat tidak valid"); return; }
   const name = nameInput || lokasi || `Lokasi ${new Date().toLocaleDateString('id-ID')}`;
-  if(!name){ toast("Beri nama lokasi"); return; }
-  const locs = loadSavedLocs();
-  // Cek duplikat nama
-  const existingIdx = locs.findIndex(l=>l.name.toLowerCase()===name.toLowerCase());
-  const newLoc = {name, lat: latNum, lng: lngNum, nama_lokasi: lokasi, alamat, created: new Date().toISOString()};
-  if(existingIdx>=0){
-    if(!confirm(`Nama "${name}" sudah ada. Timpa?`)) return;
-    locs[existingIdx]=newLoc;
-  }else{
-    locs.push(newLoc);
-  }
-  saveSavedLocs(locs);
-  renderSavedLocs();
-  $("savedLocSelect").value = String(existingIdx>=0? existingIdx : locs.length-1);
-  toast(`Lokasi "${name}" disimpan ✓`);
+  const existing = loadSavedLocs().find(l=>l.name.toLowerCase()===name.toLowerCase());
+  const row = {name, lat: latNum, lng: lngNum, nama_lokasi: lokasi, alamat};
+  if(existing && !confirm(`Nama "${name}" sudah ada. Timpa?`)) return;
+  try{
+    const q = existing
+      ? supabaseClient.from(SAVED_LOCS_TABLE).update(row).eq("id",existing.id)
+      : supabaseClient.from(SAVED_LOCS_TABLE).insert([row]);
+    const {error}=await q;
+    if(error) throw error;
+    await fetchSavedLocs();
+    const idx = loadSavedLocs().findIndex(l=>l.name.toLowerCase()===name.toLowerCase());
+    if(idx>=0) $("savedLocSelect").value = String(idx);
+    toast(`Lokasi "${name}" disimpan ✓`);
+  }catch(e){ toast("Gagal simpan lokasi: "+(e.message||e)); }
 }
 
 // ========== TODAY & TOMORROW POPUP ==========
@@ -1753,6 +1780,7 @@ function checkAdminSession(){
     if(loginEl) loginEl.classList.add('hidden');
     if(dashEl) dashEl.classList.remove('hidden');
     renderAdmin();
+    if(!savedLocsLoaded) fetchSavedLocs();
   }
 }
 
@@ -1817,8 +1845,8 @@ const closeLoginPopup=()=>{
 $("closeLogin")?.addEventListener('click', closeLoginPopup);
 $("loginBackdrop")?.addEventListener('click', closeLoginPopup);
 
-$("btnLogout").addEventListener('click',async()=>{ try{ await supabaseClient.auth.signOut(); }catch(e){} isAdminAuthed=false; location.hash=""; render(); toast("Keluar"); });
-$("btnRefresh").addEventListener('click',fetchEvents);
+$("btnLogout").addEventListener('click',async()=>{ try{ await supabaseClient.auth.signOut(); }catch(e){} isAdminAuthed=false; savedLocsCache=[]; savedLocsLoaded=false; renderSavedLocs(); location.hash=""; render(); toast("Keluar"); });
+$("btnRefresh").addEventListener('click',()=>{ fetchEvents(); fetchSavedLocs(); });
 document.querySelectorAll(".tabBtn").forEach(btn=>{
   btn.addEventListener('click',()=>{
     document.querySelectorAll(".tabBtn").forEach(b=>{ b.classList.remove('bg-emerald-900','text-white'); b.classList.add('bg-white','border','border-emerald-200'); });
@@ -1896,7 +1924,7 @@ resetForm(); fetchEvents();
 supabaseClient.auth.getSession().then(({data})=>{ isAdminAuthed=!!(data&&data.session); render(); });
 supabaseClient.auth.onAuthStateChange((_event,session)=>{
   const now=!!session;
-  if(now!==isAdminAuthed){ isAdminAuthed=now; setTimeout(render,0); }
+  if(now!==isAdminAuthed){ isAdminAuthed=now; if(!now){ savedLocsCache=[]; savedLocsLoaded=false; } setTimeout(render,0); }
 });
 // Set logo images
 document.addEventListener('DOMContentLoaded',()=>{
