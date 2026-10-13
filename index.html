@@ -1950,50 +1950,37 @@ window.openPopupById=openPopupById; window.onEdit=onEdit; window.onDelete=onDele
 </footer>
 <script src="push-subscribe.js"></script>
 <script>
-  // PWA + Notif - FIX IZIN untuk GitHub Pages & PWA
+  // FIX CHROME MOBILE & PWA - gesture safe
   (function(){
-    const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-    console.log('Bottom script PWA:', isPWA);
+    console.log('Bottom PWA check - secure:', window.isSecureContext, 'perm:', Notification.permission);
 
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js', {scope: './'}).then(reg=>{
-        console.log('SW registered ok:', reg.scope);
-      }).catch(err=>console.error('SW fail:', err));
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('sw.js', {scope:'./'}).then(r=>console.log('SW ok', r.scope)).catch(e=>console.error('SW err', e));
     }
 
-    function bindNotifBtn(){
-      const btn = document.getElementById('btn-aktifkan-notif');
+    function bindBtn(){
+      const btn=document.getElementById('btn-aktifkan-notif');
       if(!btn) return;
-      // cegah double
-      const clone = btn.cloneNode(true);
+      // remove old listeners
+      const clone=btn.cloneNode(true);
       btn.parentNode.replaceChild(clone, btn);
-      const fresh = document.getElementById('btn-aktifkan-notif');
-      fresh.addEventListener('click', async (e)=>{
+      const fresh=document.getElementById('btn-aktifkan-notif');
+      fresh.addEventListener('click', function(e){
+        // PENTING: panggil toggleNotifikasi LANGSUNG tanpa await di sini, biar Chrome mobile anggap user gesture
         e.preventDefault();
-        e.stopPropagation();
-        console.log('Notif btn clicked');
+        console.log('Notif btn clicked - direct call');
         if(typeof toggleNotifikasi==='function'){
-          // JANGAN pakai await di sini untuk jaga user gesture? tetap await tapi langsung
-          await toggleNotifikasi(null);
+          toggleNotifikasi();
         }else{
-          console.error('toggleNotifikasi belum ready');
-          if(typeof toast==='function') toast('Tunggu sebentar... klik lagi');
+          console.error('toggleNotifikasi not ready');
         }
-      });
+      }, {passive:false});
+      console.log('Notif btn bound gesture-safe');
     }
 
-    document.addEventListener('DOMContentLoaded', ()=>{
-      bindNotifBtn();
-      if(typeof checkNotifStatus==='function') checkNotifStatus();
-    });
-    window.addEventListener('load', ()=>{
-      bindNotifBtn();
-      if(typeof checkNotifStatus==='function') checkNotifStatus();
-      setTimeout(()=>{ if(typeof checkNotifStatus==='function') checkNotifStatus(); }, 1200);
-    });
-    document.addEventListener('visibilitychange', ()=>{
-      if(!document.hidden && typeof checkNotifStatus==='function') checkNotifStatus();
-    });
+    document.addEventListener('DOMContentLoaded', ()=>{ bindBtn(); if(typeof checkNotifStatus==='function') checkNotifStatus(); });
+    window.addEventListener('load', ()=>{ bindBtn(); if(typeof checkNotifStatus==='function') checkNotifStatus(); setTimeout(()=>{ if(typeof checkNotifStatus==='function') checkNotifStatus(); }, 1000); });
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && typeof checkNotifStatus==='function') checkNotifStatus(); });
   })();
 </script>
 </body>
