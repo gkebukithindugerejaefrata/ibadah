@@ -1860,21 +1860,53 @@ window.openPopupById=openPopupById; window.onEdit=onEdit; window.onDelete=onDele
 </footer>
 <script src="push-subscribe.js"></script>
 <script>
-  // Daftarkan service worker segera (untuk keperluan PWA installable),
-  // terpisah dari alur "Aktifkan Notifikasi" yang minta izin push.
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch((err) => {
-      console.error('Gagal mendaftarkan service worker:', err);
+  // PWA + Notif - FIX untuk mode standalone / installed
+  (function(){
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    console.log('PWA mode:', isPWA);
+    // Registrasi SW dengan scope yang benar untuk PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js', {scope: './'}).then(reg=>{
+        console.log('SW registered PWA ok:', reg.scope);
+      }).catch((err) => {
+        console.error('Gagal daftar SW:', err);
+      });
+    }
+    function bindNotifBtn(){
+      const btn = document.getElementById('btn-aktifkan-notif');
+      if(!btn) { console.warn('btn-aktifkan-notif tidak ditemukan'); return; }
+      // Hapus listener lama biar gak double di PWA cache
+      const clone = btn.cloneNode(true);
+      btn.parentNode.replaceChild(clone, btn);
+      const fresh = document.getElementById('btn-aktifkan-notif');
+      fresh.addEventListener('click', async (e)=>{
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('Notif btn clicked - PWA:', isPWA);
+        if(typeof toggleNotifikasi === 'function'){
+          await toggleNotifikasi(null);
+        }else{
+          console.error('toggleNotifikasi belum ready, coba reload');
+          if(typeof toast==='function') toast('Sedang memuat... coba klik lagi');
+        }
+      }, {passive:false});
+      console.log('Notif btn bound - PWA:', isPWA);
+    }
+    document.addEventListener('DOMContentLoaded', ()=>{
+      bindNotifBtn();
+      if(typeof checkNotifStatus==='function') checkNotifStatus();
     });
-  }
-  // Tombol notif sekarang berfungsi sebagai toggle: aktifkan / matikan
-  document.getElementById('btn-aktifkan-notif').addEventListener('click', () => {
-    toggleNotifikasi(null); // null karena belum pakai auth, nanti bisa diganti user id
-  });
-  // Cek status subscription saat halaman pertama dibuka, sesuaikan tampilan tombol
-  window.addEventListener('load', () => {
-    checkNotifStatus();
-  });
+    window.addEventListener('load', ()=>{
+      bindNotifBtn();
+      if(typeof checkNotifStatus==='function') checkNotifStatus();
+      // Di PWA, kadang load lebih lambat, cek lagi 1 detik
+      setTimeout(()=>{ if(typeof checkNotifStatus==='function') checkNotifStatus(); }, 1000);
+    });
+    // Untuk PWA yang di-resume dari background
+    document.addEventListener('visibilitychange', ()=>{
+      if(!document.hidden && typeof checkNotifStatus==='function') checkNotifStatus();
+    });
+  })();
 </script>
 </body>
 </html>
