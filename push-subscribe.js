@@ -1,5 +1,5 @@
-// push-subscribe.js - GKE Bukit Hindu - PWA READY
-console.log('push-subscribe.js PWA-ready loaded');
+// push-subscribe.js - GKE Bukit Hindu - PWA + FIX IZIN
+console.log('push-subscribe.js FIX IZIN loaded');
 
 function isPWA(){
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -42,6 +42,23 @@ function checkNotifStatus(){
   }
 }
 
+async function requestNotifPermission(){
+  try{
+    // Chrome modern: promise
+    if(Notification.requestPermission.length===0){
+      return await Notification.requestPermission();
+    }else{
+      // Safari old callback style
+      return await new Promise(resolve=>{
+        Notification.requestPermission(result=>resolve(result));
+      });
+    }
+  }catch(e){
+    console.error('requestPermission error', e);
+    return Notification.permission;
+  }
+}
+
 async function toggleNotifikasi(userId){
   const btn = document.getElementById('btn-aktifkan-notif');
   if(!btn) return;
@@ -49,6 +66,7 @@ async function toggleNotifikasi(userId){
   btn._busy = true;
   const origDisabled = btn.disabled;
   btn.disabled = true;
+
   try{
     if(!('Notification' in window)){
       if(typeof toast==='function') toast('Browser tidak mendukung notifikasi 🔕');
@@ -58,7 +76,7 @@ async function toggleNotifikasi(userId){
     }
 
     const isActive = btn.dataset.active==='true';
-    console.log('[Notif] toggle PWA:', isPWA(), 'isActive:', isActive, 'perm:', Notification.permission);
+    console.log('[Notif] toggle click PWA:', isPWA(), 'isActive:', isActive, 'perm:', Notification.permission);
 
     if(isActive){
       localStorage.setItem('gke_notif_enabled','false');
@@ -71,77 +89,96 @@ async function toggleNotifikasi(userId){
       }catch(e){ console.log('unsub skip', e); }
       updateNotifUI(false);
       if(typeof toast==='function') toast('Notifikasi dimatikan');
-    }else{
-      if(Notification.permission==='denied'){
-        const msg = isPWA() ? 'Izin diblokir. Buka Pengaturan Android > Aplikasi > GKE Jadwal > Notifikasi > Izinkan' : 'Izin diblokir. Buka 🔒 di address bar > Setelan situs > Izinkan notifikasi';
-        if(typeof toast==='function') toast(msg);
-        else alert(msg);
-        updateNotifUI(false);
-        return;
-      }
-
-      let perm = Notification.permission;
-      if(perm==='default'){
-        perm = await Notification.requestPermission();
-        console.log('[Notif] after request:', perm);
-      }
-
-      if(perm!=='granted'){
-        if(typeof toast==='function') toast('Izin notifikasi belum diberikan');
-        updateNotifUI(false);
-        return;
-      }
-
-      // Pastikan SW ready - PENTING untuk PWA
-      if('serviceWorker' in navigator){
-        try{
-          let reg = await navigator.serviceWorker.getRegistration();
-          if(!reg){
-            reg = await navigator.serviceWorker.register('sw.js', {scope:'./'});
-            console.log('[Notif] SW registered from toggle');
-          }
-          await navigator.serviceWorker.ready;
-          console.log('[Notif] SW ready');
-        }catch(e){
-          console.warn('SW register gagal, lanjut mode lokal', e);
-        }
-      }
-
-      localStorage.setItem('gke_notif_enabled','true');
-      updateNotifUI(true);
-      if(typeof toast==='function') toast('Notifikasi aktif ✓' + (isPWA() ? ' (PWA)' : ''));
-
-      setTimeout(async ()=>{
-        try{
-          if(Notification.permission==='granted'){
-            // Di PWA harus pakai SW showNotification
-            if('serviceWorker' in navigator){
-              try{
-                const reg = await navigator.serviceWorker.ready;
-                if(reg && reg.showNotification){
-                  await reg.showNotification('GKE Bukit Hindu - Gereja Efrata', {
-                    body: isPWA() ? 'PWA aktif! Kamu akan dapat pengingat jadwal terbaru.' : 'Notifikasi jadwal ibadah aktif.',
-                    icon:'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png',
-                    badge:'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png',
-                    vibrate:[200,100,200],
-                    tag:'gke-test',
-                    renotify:true,
-                    data:{url: location.href}
-                  });
-                  console.log('[Notif] test notif shown via SW');
-                  return;
-                }
-              }catch(e){ console.warn('SW notif fail', e); }
-            }
-            // Fallback untuk browser biasa
-            new Notification('GKE Bukit Hindu', {
-              body:'Notifikasi jadwal ibadah aktif.',
-              icon:'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png'
-            });
-          }
-        }catch(e){ console.log('test notif error', e); }
-      }, 600);
+      return;
     }
+
+    // === MAU AKTIFKAN ===
+    let perm = Notification.permission;
+
+    // Jika sudah denied permanen
+    if(perm==='denied'){
+      const msg = isPWA() 
+        ? 'Diblokir permanen. Android: Pengaturan > Aplikasi > GKE Jadwal > Notifikasi > Izinkan. Lalu buka PWA lagi.'
+        : 'Diblokir. Klik ikon 🔒 di kiri address bar > Setelan situs > Notifikasi > Izinkan, atau klik Reset izin.';
+      if(typeof toast==='function') toast(msg);
+      else alert(msg);
+      updateNotifUI(false);
+      // Buka info
+      console.warn('[Notif] permission denied permanen');
+      return;
+    }
+
+    // Jika default, minta izin - HARUS langsung tanpa await lain agar gesture terjaga
+    if(perm==='default'){
+      console.log('[Notif] requesting permission...');
+      perm = await requestNotifPermission();
+      console.log('[Notif] after request:', perm, 'real perm:', Notification.permission);
+    }
+
+    // Setelah request, cek lagi
+    if(perm==='default'){
+      // User menutup prompt tanpa pilih
+      if(typeof toast==='function') toast('Kamu menutup prompt izin. Klik tombol Notifikasi lagi dan pilih Izinkan/Allow. Atau klik 🔒 di address bar > Izinkan notifikasi.');
+      else alert('Prompt tertutup. Klik lagi dan pilih Izinkan.');
+      updateNotifUI(false);
+      return;
+    }
+
+    if(perm!=='granted'){
+      if(typeof toast==='function') toast('Izin notifikasi belum diberikan. Status: '+perm);
+      updateNotifUI(false);
+      return;
+    }
+
+    // === GRANTED ===
+    if('serviceWorker' in navigator){
+      try{
+        let reg = await navigator.serviceWorker.getRegistration();
+        if(!reg){
+          reg = await navigator.serviceWorker.register('sw.js', {scope:'./'});
+          console.log('[Notif] SW registered from toggle');
+        }
+        await navigator.serviceWorker.ready;
+        console.log('[Notif] SW ready');
+      }catch(e){
+        console.warn('SW register gagal, lanjut mode lokal', e);
+      }
+    }
+
+    localStorage.setItem('gke_notif_enabled','true');
+    updateNotifUI(true);
+    if(typeof toast==='function') toast('Notifikasi aktif ✓' + (isPWA() ? ' (PWA)' : ''));
+
+    // Test notif
+    setTimeout(async ()=>{
+      try{
+        if(Notification.permission==='granted'){
+          if('serviceWorker' in navigator){
+            try{
+              const reg = await navigator.serviceWorker.ready;
+              if(reg && reg.showNotification){
+                await reg.showNotification('GKE Bukit Hindu - Gereja Efrata', {
+                  body: isPWA() ? 'PWA aktif! Kamu akan dapat pengingat jadwal terbaru.' : 'Notifikasi jadwal ibadah aktif. Cek pengaturan notifikasi.',
+                  icon:'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png',
+                  badge:'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png',
+                  vibrate:[200,100,200],
+                  tag:'gke-test',
+                  renotify:true,
+                  data:{url: location.href}
+                });
+                console.log('[Notif] test via SW ok');
+                return;
+              }
+            }catch(e){ console.warn('SW notif fail', e); }
+          }
+          new Notification('GKE Bukit Hindu', {
+            body:'Notifikasi aktif!',
+            icon:'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png'
+          });
+        }
+      }catch(e){ console.log('test notif error', e); }
+    }, 700);
+
   }catch(err){
     console.error('toggleNotifikasi error', err);
     if(typeof toast==='function') toast('Gagal: '+(err.message||err));
