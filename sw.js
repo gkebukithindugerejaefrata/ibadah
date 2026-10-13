@@ -1,53 +1,113 @@
-// sw.js — Service Worker untuk menerima Web Push
-// Taruh file ini di root domain (misal: https://situskamu.com/sw.js)
-// agar scope-nya mencakup seluruh halaman.
+// sw.js - GKE Bukit Hindu PWA + Push - PWA FIXED
+const CACHE_NAME = 'gke-bukit-hindu-v3-pwa';
+const ASSETS = [
+  './',
+  './ibadah.html',
+  './manifest.json',
+  './push-subscribe.js'
+];
 
 self.addEventListener('install', (event) => {
+  console.log('[SW] install', CACHE_NAME);
   self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll(ASSETS).catch(err=>{
+        console.warn('[SW] cache addAll fail', err);
+        // tetap lanjut walau gagal cache satu file
+        return Promise.resolve();
+      });
+    })
+  );
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  console.log('[SW] activate');
+  event.waitUntil(
+    caches.keys().then(keys => {
+      return Promise.all(keys.map(k => {
+        if(k!==CACHE_NAME){
+          console.log('[SW] deleting old cache', k);
+          return caches.delete(k);
+        }
+        return null;
+      }));
+    }).then(()=>self.clients.claim())
+  );
 });
 
-// Event ini terpanggil saat push notification diterima dari server
-self.addEventListener('push', (event) => {
-  let data = {};
-  try {
-    data = event.data ? event.data.json() : {};
-  } catch (e) {
-    data = { title: 'Notifikasi', body: event.data ? event.data.text() : '' };
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  // Jangan cache API Supabase dan POST
+  if(url.href.includes('supabase') || event.request.method!=='GET' || url.protocol==='chrome-extension:'){
+    return;
   }
+  // Untuk HTML, network first agar selalu fresh (penting untuk PWA)
+  if(event.request.headers.get('accept')?.includes('text/html')){
+    event.respondWith(
+      fetch(event.request).then(res=>{
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(c=>c.put(event.request, clone)).catch(()=>{});
+        return res;
+      }).catch(()=>caches.match(event.request))
+    );
+    return;
+  }
+  // Untuk asset lain, cache first
+  event.respondWith(
+    caches.match(event.request).then(cached => {
+      if(cached) return cached;
+      return fetch(event.request).then(res=>{
+        // cache copy
+        if(res.ok){
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(c=>c.put(event.request, clone)).catch(()=>{});
+        }
+        return res;
+      }).catch(()=>cached);
+    })
+  );
+});
 
-  const title = data.title || 'Pemberitahuan';
+self.addEventListener('push', (event) => {
+  console.log('[SW] push received', event.data?.text());
+  let data = {};
+  try{
+    if(event.data){
+      try{ data = event.data.json(); }catch{ data = {body: event.data.text()}; }
+    }
+  }catch(e){ data = {body: 'Ada jadwal ibadah terbaru'}; }
+  const title = data.title || 'Jadwal Ibadah GKE Bukit Hindu';
   const options = {
-    body: data.body || '',
-    icon: data.icon || '/icon-192.png',   // ganti sesuai icon kamu
-    badge: data.badge || '/badge-72.png', // opsional
-    image: data.image || undefined,       // gambar besar di badan notifikasi (opsional)
-    data: {
-      url: data.url || '/', // url yang dibuka saat notif diklik
-    },
+    body: data.body || 'Ada jadwal ibadah terbaru, cek sekarang!',
+    icon: data.icon || 'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png',
+    badge: 'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png',
+    vibrate: [200,100,200],
+    tag: 'gke-jadwal',
+    renotify: true,
+    requireInteraction: false,
+    data: { url: data.url || './ibadah.html' }
   };
-
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Event ini terpanggil saat user klik notifikasinya
 self.addEventListener('notificationclick', (event) => {
+  console.log('[SW] notif click');
   event.notification.close();
-  const targetUrl = event.notification.data?.url || '/';
-
+  const url = event.notification.data?.url || './ibadah.html';
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if (client.url === targetUrl && 'focus' in client) {
-          return client.focus();
+    clients.matchAll({type:'window', includeUncontrolled:true}).then(list=>{
+      for(const c of list){
+        if(c.url.includes('ibadah') && 'focus' in c){
+          c.navigate(url).catch(()=>{});
+          return c.focus();
         }
       }
-      if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
-      }
+      return clients.openWindow(url);
     })
   );
+});
+
+self.addEventListener('notificationclose', (event)=>{
+  console.log('[SW] notif closed');
 });

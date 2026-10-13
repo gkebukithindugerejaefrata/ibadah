@@ -1,5 +1,9 @@
-// push-subscribe.js - GKE Bukit Hindu - REAL IMPLEMENTATION
-console.log('push-subscribe.js loaded - real logic active');
+// push-subscribe.js - GKE Bukit Hindu - PWA READY
+console.log('push-subscribe.js PWA-ready loaded');
+
+function isPWA(){
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
 
 function updateNotifUI(active){
   const btn = document.getElementById('btn-aktifkan-notif');
@@ -30,6 +34,7 @@ function checkNotifStatus(){
   }
   const perm = Notification.permission;
   const localEnabled = localStorage.getItem('gke_notif_enabled')==='true';
+  console.log('[Notif] check PWA:', isPWA(), 'perm:', perm, 'local:', localEnabled);
   if(perm==='granted' && localEnabled){
     updateNotifUI(true);
   }else{
@@ -42,6 +47,7 @@ async function toggleNotifikasi(userId){
   if(!btn) return;
   if(btn._busy) return;
   btn._busy = true;
+  const origDisabled = btn.disabled;
   btn.disabled = true;
   try{
     if(!('Notification' in window)){
@@ -52,9 +58,9 @@ async function toggleNotifikasi(userId){
     }
 
     const isActive = btn.dataset.active==='true';
+    console.log('[Notif] toggle PWA:', isPWA(), 'isActive:', isActive, 'perm:', Notification.permission);
 
     if(isActive){
-      // MATIKAN
       localStorage.setItem('gke_notif_enabled','false');
       try{
         const reg = await navigator.serviceWorker.getRegistration();
@@ -66,10 +72,10 @@ async function toggleNotifikasi(userId){
       updateNotifUI(false);
       if(typeof toast==='function') toast('Notifikasi dimatikan');
     }else{
-      // AKTIFKAN
       if(Notification.permission==='denied'){
-        if(typeof toast==='function') toast('Izin notifikasi diblokir. Buka 🔒 di address bar > Setelan situs > Izinkan notifikasi');
-        else alert('Izin diblokir. Aktifkan di pengaturan browser.');
+        const msg = isPWA() ? 'Izin diblokir. Buka Pengaturan Android > Aplikasi > GKE Jadwal > Notifikasi > Izinkan' : 'Izin diblokir. Buka 🔒 di address bar > Setelan situs > Izinkan notifikasi';
+        if(typeof toast==='function') toast(msg);
+        else alert(msg);
         updateNotifUI(false);
         return;
       }
@@ -77,6 +83,7 @@ async function toggleNotifikasi(userId){
       let perm = Notification.permission;
       if(perm==='default'){
         perm = await Notification.requestPermission();
+        console.log('[Notif] after request:', perm);
       }
 
       if(perm!=='granted'){
@@ -85,13 +92,16 @@ async function toggleNotifikasi(userId){
         return;
       }
 
+      // Pastikan SW ready - PENTING untuk PWA
       if('serviceWorker' in navigator){
         try{
           let reg = await navigator.serviceWorker.getRegistration();
           if(!reg){
-            reg = await navigator.serviceWorker.register('sw.js');
-            await navigator.serviceWorker.ready;
+            reg = await navigator.serviceWorker.register('sw.js', {scope:'./'});
+            console.log('[Notif] SW registered from toggle');
           }
+          await navigator.serviceWorker.ready;
+          console.log('[Notif] SW ready');
         }catch(e){
           console.warn('SW register gagal, lanjut mode lokal', e);
         }
@@ -99,46 +109,52 @@ async function toggleNotifikasi(userId){
 
       localStorage.setItem('gke_notif_enabled','true');
       updateNotifUI(true);
-      if(typeof toast==='function') toast('Notifikasi aktif ✓');
+      if(typeof toast==='function') toast('Notifikasi aktif ✓' + (isPWA() ? ' (PWA)' : ''));
 
       setTimeout(async ()=>{
         try{
           if(Notification.permission==='granted'){
+            // Di PWA harus pakai SW showNotification
             if('serviceWorker' in navigator){
-              const reg = await navigator.serviceWorker.ready;
-              if(reg && reg.showNotification){
-                await reg.showNotification('GKE Bukit Hindu - Gereja Efrata', {
-                  body:'Notifikasi jadwal ibadah aktif. Kamu akan dapat pengingat jadwal terbaru.',
-                  icon:'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png',
-                  badge:'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png',
-                  vibrate:[100,50,100],
-                  data:{url: location.href}
-                });
-                return;
-              }
+              try{
+                const reg = await navigator.serviceWorker.ready;
+                if(reg && reg.showNotification){
+                  await reg.showNotification('GKE Bukit Hindu - Gereja Efrata', {
+                    body: isPWA() ? 'PWA aktif! Kamu akan dapat pengingat jadwal terbaru.' : 'Notifikasi jadwal ibadah aktif.',
+                    icon:'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png',
+                    badge:'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png',
+                    vibrate:[200,100,200],
+                    tag:'gke-test',
+                    renotify:true,
+                    data:{url: location.href}
+                  });
+                  console.log('[Notif] test notif shown via SW');
+                  return;
+                }
+              }catch(e){ console.warn('SW notif fail', e); }
             }
-            new Notification('GKE Bukit Hindu - Gereja Efrata', {
+            // Fallback untuk browser biasa
+            new Notification('GKE Bukit Hindu', {
               body:'Notifikasi jadwal ibadah aktif.',
               icon:'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png'
             });
           }
         }catch(e){ console.log('test notif error', e); }
-      }, 700);
+      }, 600);
     }
   }catch(err){
     console.error('toggleNotifikasi error', err);
     if(typeof toast==='function') toast('Gagal: '+(err.message||err));
   }finally{
     btn._busy = false;
-    btn.disabled = false;
+    btn.disabled = origDisabled;
   }
 }
 
-// Expose global
 window.updateNotifUI = updateNotifUI;
 window.checkNotifStatus = checkNotifStatus;
 window.toggleNotifikasi = toggleNotifikasi;
+window.isPWA = isPWA;
 
-// Auto check on load
 document.addEventListener('DOMContentLoaded', checkNotifStatus);
 window.addEventListener('load', checkNotifStatus);
