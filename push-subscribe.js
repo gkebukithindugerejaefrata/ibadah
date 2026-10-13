@@ -1,5 +1,29 @@
-// push-subscribe.js - FIX CHROME MOBILE & PWA - gesture-safe
-console.log('push-subscribe.js CHROME-MOBILE FIX loaded');
+// push-subscribe.js - FIXED v2 - SUDAH ADA VAPID KEY BARU
+console.log('push-subscribe.js FIXED v2 loaded');
+
+const VAPID_PUBLIC_KEY = "BBY5ufpzNiBTshM6vCySRt5Ag1pRTUllP3VfoHkbGYfwigmqGTVW_00DpHAtQ3E2QMp9oTpzMV91U711LcsN0oY";
+const SUPABASE_URL = "https://gpgjgplqsvyexumoljyo.supabase.co";
+const SUPABASE_KEY = "sb_publishable_JaVgg3CuVmI9SczGkoaRZQ_EaYoV9z9";
+
+function getSupabaseClient(){
+  if(window.supabase && window.supabase.createClient){
+    if(window._gkeSupabase) return window._gkeSupabase;
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    window._gkeSupabase = client;
+    return client;
+  }
+  console.warn('Supabase SDK belum load');
+  return null;
+}
+
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for(let i=0;i<rawData.length;++i) outputArray[i]=rawData.charCodeAt(i);
+  return outputArray;
+}
 
 function isPWA(){
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || document.referrer.includes('android-app://');
@@ -29,13 +53,11 @@ function updateNotifUI(active){
 
 function checkNotifStatus(){
   if(!('Notification' in window)){
-    console.log('[Notif] no Notification API');
     updateNotifUI(false);
     return;
   }
   const perm = Notification.permission;
   const localEnabled = localStorage.getItem('gke_notif_enabled')==='true';
-  console.log('[Notif] check - PWA:', isPWA(), 'perm:', perm, 'local:', localEnabled, 'isSecure:', window.isSecureContext);
   if(perm==='granted' && localEnabled){
     updateNotifUI(true);
   }else{
@@ -43,72 +65,85 @@ function checkNotifStatus(){
   }
 }
 
-// Fungsi aktifkan setelah granted - dipisah biar bisa dipanggil setelah requestPermission
+async function subscribeAndSaveToSupabase(){
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    
+    if(!sub){
+      console.log('[Notif] bikin subscription baru...');
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+
+    const supabaseClient = getSupabaseClient();
+    if(!supabaseClient) return sub;
+
+    const subJson = sub.toJSON();
+    const { data: existing } = await supabaseClient.from('push_subscriptions').select('id').eq('endpoint', sub.endpoint).maybeSingle();
+    
+    if(!existing){
+      const { error } = await supabaseClient.from('push_subscriptions').insert({
+        endpoint: sub.endpoint,
+        keys: { p256dh: subJson.keys.p256dh, auth: subJson.keys.auth },
+        subscription: subJson,
+        created_at: new Date().toISOString(),
+        user_agent: navigator.userAgent
+      });
+      if(error){
+        console.error('gagal simpan', error);
+      }else{
+        console.log('berhasil simpan ke Supabase');
+      }
+    }
+    return sub;
+  }catch(e){
+    console.error('subscribe error', e);
+    return null;
+  }
+}
+
 async function activateNotif(){
   try{
     if('serviceWorker' in navigator){
-      try{
-        let reg = await navigator.serviceWorker.getRegistration();
-        if(!reg){
-          reg = await navigator.serviceWorker.register('sw.js', {scope:'./'});
-          console.log('[Notif] SW registered');
-        }
-        await navigator.serviceWorker.ready;
-      }catch(e){ console.warn('SW fail', e); }
+      let reg = await navigator.serviceWorker.getRegistration();
+      if(!reg){
+        reg = await navigator.serviceWorker.register('sw.js', {scope:'./'});
+      }
+      await navigator.serviceWorker.ready;
     }
     localStorage.setItem('gke_notif_enabled','true');
     updateNotifUI(true);
-    if(typeof toast==='function') toast('Notifikasi aktif ✓' + (isPWA()?' (PWA)':''));
-    else alert('Notifikasi aktif');
-
-    // Test notif
+    await subscribeAndSaveToSupabase();
+    if(typeof toast==='function') toast('Notifikasi aktif ✓');
+    
     setTimeout(async ()=>{
       try{
-        if(Notification.permission==='granted'){
-          if('serviceWorker' in navigator){
-            const reg = await navigator.serviceWorker.ready;
-            if(reg && reg.showNotification){
-              await reg.showNotification('GKE Bukit Hindu', {
-                body: 'Notifikasi aktif! Kamu akan dapat info jadwal terbaru.',
-                icon:'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png',
-                badge:'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png',
-                vibrate:[200,100,200],
-                tag:'gke-test',
-                data:{url: location.href}
-              });
-              return;
-            }
-          }
-          new Notification('GKE Bukit Hindu', {body:'Notifikasi aktif!'});
+        if(Notification.permission==='granted' && 'serviceWorker' in navigator){
+          const reg = await navigator.serviceWorker.ready;
+          await reg.showNotification('GKE Bukit Hindu', {
+            body: 'Notifikasi aktif! Kamu akan dapat info jadwal terbaru.',
+            icon:'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png',
+            tag:'gke-test',
+            data:{url: location.href}
+          });
         }
-      }catch(e){ console.log('test notif err', e); }
+      }catch(e){}
     }, 800);
   }catch(e){ console.error(e); }
 }
 
 function toggleNotifikasi(){
-  // PENTING: jangan bikin async di awal, biar gesture Chrome mobile kepake
   const btn = document.getElementById('btn-aktifkan-notif');
-  if(!btn){
-    console.error('btn not found');
-    return;
-  }
-  if(btn._busy){
-    console.log('busy');
-    return;
-  }
-
+  if(!btn || btn._busy) return;
   if(!('Notification' in window)){
-    if(typeof toast==='function') toast('Browser tidak support notifikasi 🔕');
     updateNotifUI(false);
     return;
   }
-
   const isActive = btn.dataset.active==='true';
-  console.log('[Notif] click - PWA:', isPWA(), 'active:', isActive, 'perm:', Notification.permission, 'secure:', window.isSecureContext);
-
   if(isActive){
-    // MATIKAN - ini boleh async
     (async ()=>{
       btn._busy=true;
       try{
@@ -116,7 +151,11 @@ function toggleNotifikasi(){
         const reg = await navigator.serviceWorker.getRegistration().catch(()=>null);
         if(reg){
           const sub = await reg.pushManager.getSubscription().catch(()=>null);
-          if(sub) await sub.unsubscribe().catch(()=>{});
+          if(sub){
+            const client = getSupabaseClient();
+            if(client) await client.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+            await sub.unsubscribe().catch(()=>{});
+          }
         }
         updateNotifUI(false);
         if(typeof toast==='function') toast('Notifikasi dimatikan');
@@ -125,63 +164,20 @@ function toggleNotifikasi(){
     return;
   }
 
-  // MAU AKTIFKAN
   let perm = Notification.permission;
-
   if(perm==='denied'){
-    const msg = isPWA()
-      ? 'Diblokir. Cara buka: Pengaturan HP > Aplikasi > GKE Jadwal > Notifikasi > Izinkan. Atau buka di Chrome biasa, klik gembok 🔒 > Setelan situs > Izinkan.'
-      : 'Diblokir. Klik gembok 🔒 di kiri address bar > Setelan situs > Notifikasi > Izinkan. Lalu reload.';
-    if(typeof toast==='function') toast(msg);
-    else alert(msg);
+    if(typeof toast==='function') toast('Diblokir. Klik gembok 🔒 di address bar > Izinkan notifikasi.');
     updateNotifUI(false);
     return;
   }
-
   if(perm==='default'){
-    // INI KUNCINYA: panggil requestPermission LANGSUNG tanpa await sebelumnya, biar gesture Chrome mobile tidak hilang
-    console.log('[Notif] requesting permission - gesture safe');
-    try{
-      const promise = Notification.requestPermission();
-      // Modern Chrome returns Promise
-      if(promise && promise.then){
-        promise.then(result=>{
-          console.log('[Notif] request result:', result);
-          if(result==='granted'){
-            activateNotif();
-          }else if(result==='default'){
-            if(typeof toast==='function') toast('Kamu menutup prompt. Klik tombol 🔔 lagi dan pilih Izinkan. Kalau gak muncul, klik 🔒 di address bar > Izinkan notifikasi.');
-            updateNotifUI(false);
-          }else{
-            if(typeof toast==='function') toast('Izin ditolak. Klik 🔒 > Setelan situs > Izinkan notifikasi.');
-            updateNotifUI(false);
-          }
-        }).catch(err=>{
-          console.error('requestPermission promise err', err);
-          if(typeof toast==='function') toast('Gagal minta izin: '+err.message);
-        });
-      }else{
-        // Old callback style fallback
-        Notification.requestPermission(result=>{
-          console.log('[Notif] request result cb:', result);
-          if(result==='granted') activateNotif();
-          else{
-            if(typeof toast==='function') toast('Izin belum diberikan: '+result);
-            updateNotifUI(false);
-          }
-        });
-      }
-    }catch(e){
-      console.error('requestPermission sync err', e);
-      if(typeof toast==='function') toast('Error minta izin: '+e.message);
-    }
+    Notification.requestPermission().then(result=>{
+      if(result==='granted') activateNotif();
+      else updateNotifUI(false);
+    });
     return;
   }
-
-  // perm === granted - langsung aktifkan
-  if(perm==='granted'){
-    activateNotif();
-  }
+  if(perm==='granted') activateNotif();
 }
 
 window.updateNotifUI = updateNotifUI;
