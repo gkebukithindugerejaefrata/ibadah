@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DIAGNOSA PUSH FCM</title>
+<style>body{font-family:sans-serif;padding:12px}#log{background:#111;color:#0f0;padding:10px;white-space:pre-wrap;min-height:400px;font-size:12px}</style>
+</head>
+<body>
+<h3>Diagnosa FCM - Tes 3 kunci</h3>
+<p>Buka di Chrome biasa (bukan incognito), bukan di dalam WA/FB</p>
+<button id="btn" style="padding:12px 20px;background:#16a34a;color:#fff;border:none;border-radius:20px">JALANKAN DIAGNOSA</button>
+<div id="log"></div>
+<script>
+const OUR_KEY_PART1 = "BOxJ4tacjNSjBIGp6xrWwZkTaxp";
+const OUR_KEY_PART2 = "FcEMNEMeoQrgHweCUVx1kUECehxqAlMlNcmTr6LCaMutISDcz-nYVVfY05YQ";
+const OUR_KEY = OUR_KEY_PART1 + OUR_KEY_PART2;
+// kunci demo dari MDN yang pasti valid
+const DEMO_KEY = "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLxyk5N_Kg6c";
+
+function log(m){ const el=document.getElementById('log'); el.textContent += "\n" + new Date().toLocaleTimeString() + " " + m; console.log(m); }
+function b64toU8(b64){
+  const pad='='.repeat((4-b64.length%4)%4);
+  const std=(b64+pad).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(std);
+  const out=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
+  return out;
+}
+
+async function run(){
+  log('=== DIAGNOSA MULAI ===');
+  log('isSecureContext:'+window.isSecureContext+' Notification:'+('Notification' in window)+' SW:'+('serviceWorker' in navigator));
+  log('UA:'+navigator.userAgent.slice(0,80));
+  try{
+    const perm = await Notification.requestPermission();
+    log('Permission:'+perm);
+    if(perm!=='granted'){ log('Berhenti - izin ditolak'); return; }
+  }catch(e){ log('perm error '+e.message); }
+
+  let reg;
+  try{
+    reg = await navigator.serviceWorker.register('sw.js', {scope:'./'});
+    log('SW registered '+reg.scope);
+    await navigator.serviceWorker.ready;
+    log('SW ready');
+  }catch(e){ log('SW fail '+e.message); return; }
+
+  // hapus sub lama dulu
+  try{
+    const old = await reg.pushManager.getSubscription();
+    if(old){ log('Old sub found, unsub...'); await old.unsubscribe(); log('Old unsub ok'); }
+  }catch(e){ log('old sub err '+e.message); }
+
+  // Tes 1: tanpa VAPID (biar tau FCM-nya nyambung gak)
+  try{
+    log('--- Tes 1: TANPA VAPID (cek FCM konek gak) ---');
+    const sub1 = await reg.pushManager.subscribe({userVisibleOnly:true});
+    log('Tes1 SUKSES tanpa VAPID! endpoint:'+sub1.endpoint.slice(0,50));
+    await sub1.unsubscribe(); log('Tes1 unsub ok');
+  }catch(e){
+    log('Tes1 GAGAL (tanpa VAPID): '+e.message);
+  }
+
+  // Tes 2: pakai kunci DEMO MDN
+  try{
+    log('--- Tes 2: Pakai KUNCI DEMO MDN (yang pasti valid) ---');
+    const sub2 = await reg.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey: b64toU8(DEMO_KEY)
+    });
+    log('Tes2 SUKSES dengan kunci DEMO! endpoint:'+sub2.endpoint.slice(0,50));
+    await sub2.unsubscribe(); log('Tes2 unsub ok');
+  }catch(e){
+    log('Tes2 GAGAL dengan kunci DEMO: '+e.message+' - Jika ini gagal juga, berarti jaringan/HP yang ngeblok FCM, bukan kuncinya');
+  }
+
+  // Tes 3: pakai kunci kita BOxJ
+  try{
+    log('--- Tes 3: Pakai KUNCI KITA BOxJ... ---');
+    log('Key len:'+OUR_KEY.length);
+    const sub3 = await reg.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey: b64toU8(OUR_KEY)
+    });
+    log('Tes3 SUKSES dengan kunci KITA! endpoint:'+sub3.endpoint.slice(0,50));
+    log('>>> BERARTI KUNCI KITA VALID, yang error kemarin karena sisa SW lama. Sekarang sudah bisa pakai!');
+    // simpan ke Supabase sekalian
+    log('Simpan ke Supabase...');
+    const client = window.supabase ? window.supabase.createClient("https://gpgjgplqsvyexumoljyo.supabase.co","sb_publishable_JaVgg3CuVmI9SczGkoaRZQ_EaYoV9z9") : null;
+    if(client){
+      const j = sub3.toJSON();
+      const {error} = await client.from('push_subscriptions').insert({
+        endpoint: sub3.endpoint,
+        keys: {p256dh:j.keys.p256dh, auth:j.keys.auth},
+        subscription: j,
+        created_at: new Date().toISOString(),
+        user_agent: navigator.userAgent
+      });
+      if(error) log('Simpan gagal:'+error.message);
+      else log('Simpan OK - cek Tabel!');
+    }
+  }catch(e){
+    log('Tes3 GAGAL dengan kunci KITA: '+e.message);
+    log('Jika Tes2 sukses tapi Tes3 gagal, berarti kunci kita ada yang salah, kita ganti lagi');
+  }
+
+  log('=== SELESAI ===');
+}
+
+document.getElementById('btn').onclick = run;
+log('Siap - klik JALANKAN DIAGNOSA (pakai Chrome biasa, bukan incognito)');
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.50.0/dist/umd/supabase.min.js"></script>
+</body>
+</html>
