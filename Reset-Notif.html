@@ -1,0 +1,98 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RESET NOTIF GKE - KUNCI BARU</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.50.0/dist/umd/supabase.min.js"></script>
+<style>
+body{font-family:sans-serif;padding:20px;background:#fff7ed}
+#log{white-space:pre-wrap;background:#111;color:#0f0;padding:12px;border-radius:8px;min-height:300px;margin-top:12px;font-size:12px}
+button{padding:14px 20px;border-radius:999px;border:none;font-weight:bold;cursor:pointer;margin:5px}
+</style>
+</head>
+<body>
+<h2>RESET TOTAL NOTIF - KUNCI BARU BOxJ</h2>
+<button id="btnReset" style="background:#dc2626;color:white">1. RESET TOTAL</button>
+<button id="btnTest" style="background:#16a34a;color:white">2. TES BIKIN BARU</button>
+<div id="log"></div>
+<script>
+const VAPID_PART1 = "BOxJ4tacjNSjBIGp6xrWwZkTaxp";
+const VAPID_PART2 = "FcEMNEMeoQrgHweCUVx1kUECehxqAlMlNcmTr6LCaMutISDcz-nYVVfY05YQ";
+const VAPID_PUBLIC_KEY = VAPID_PART1 + VAPID_PART2;
+const SUPABASE_URL = "https://gpgjgplqsvyexumoljyo.supabase.co";
+const SUPABASE_KEY = "sb_publishable_JaVgg3CuVmI9SczGkoaRZQ_EaYoV9z9";
+function log(msg){
+  const el=document.getElementById('log');
+  el.textContent += "\n" + new Date().toLocaleTimeString() + " - " + msg;
+  console.log(msg);
+}
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for(let i=0;i<rawData.length;++i) outputArray[i]=rawData.charCodeAt(i);
+  return outputArray;
+}
+async function resetTotal(){
+  log('=== RESET TOTAL ===');
+  try{ localStorage.removeItem('gke_notif_enabled'); log('localStorage hapus'); }catch(e){}
+  try{
+    const regs = await navigator.serviceWorker.getRegistrations();
+    log('Found '+regs.length+' SW');
+    for(const reg of regs){
+      const sub = await reg.pushManager.getSubscription().catch(()=>null);
+      if(sub){
+        log('Unsub: '+sub.endpoint.slice(0,40));
+        try{ await sub.unsubscribe(); log('Unsub OK'); }catch(e){ log('Unsub err '+e.message); }
+      }
+      await reg.unregister().then(()=>log('SW unregister OK'));
+    }
+  }catch(e){ log('Reset err '+e.message); }
+  log('RESET SELESAI - tutup tab, buka incognito baru, lalu klik TES BIKIN BARU');
+}
+async function testBaru(){
+  log('=== TES KUNCI BARU BOxJ ===');
+  log('VAPID: '+VAPID_PUBLIC_KEY.slice(0,20)+'...');
+  try{
+    let reg = await navigator.serviceWorker.register('sw.js', {scope:'./'});
+    log('SW registered '+reg.scope);
+    await navigator.serviceWorker.ready;
+    const perm = await Notification.requestPermission();
+    log('Permission: '+perm);
+    if(perm!=='granted') return;
+    log('Subscribe dengan kunci baru...');
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+    log('BERHASIL! '+sub.endpoint.slice(0,50));
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const subJson = sub.toJSON();
+    log('Simpan ke Supabase...');
+    const { error } = await client.from('push_subscriptions').insert({
+      endpoint: sub.endpoint,
+      keys: { p256dh: subJson.keys.p256dh, auth: subJson.keys.auth },
+      subscription: subJson,
+      created_at: new Date().toISOString(),
+      user_agent: navigator.userAgent
+    });
+    if(error) log('GAGAL SIMPAN: '+error.message);
+    else log('BERHASIL SIMPAN! Cek Tabel, harus ada 1 baris');
+    await reg.showNotification('GKE - KUNCI BARU OK', {
+      body: 'Kalau ini muncul, berhasil!',
+      icon: './icon-192.png'
+    });
+  }catch(e){
+    log('ERROR: '+e.message);
+    log(e.stack||'');
+  }
+}
+document.getElementById('btnReset').onclick=resetTotal;
+document.getElementById('btnTest').onclick=testBaru;
+log('Siap - klik RESET TOTAL dulu');
+</script>
+</body>
+</html>
