@@ -1,14 +1,15 @@
-// push-subscribe.js - FIXED v2 - SUDAH ADA VAPID KEY BARU
-console.log('push-subscribe.js FIXED v2 loaded');
+// push-subscribe.js - FIXED v3 - NO CONFLICT (tidak pakai const SUPABASE_URL lagi)
+console.log('push-subscribe.js FIXED v3 loaded');
 
 const VAPID_PUBLIC_KEY = "BBY5ufpzNiBTshM6vCySRt5Ag1pRTUllP3VfoHkbGYfwigmqGTVW_00DpHAtQ3E2QMp9oTpzMV91U711LcsN0oY";
-const SUPABASE_URL = "https://gpgjgplqsvyexumoljyo.supabase.co";
-const SUPABASE_KEY = "sb_publishable_JaVgg3CuVmI9SczGkoaRZQ_EaYoV9z9";
+// pakai yang sudah ada di index.html kalau ada, biar tidak tabrakan const
+const PUSH_SUPABASE_URL = (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : "https://gpgjgplqsvyexumoljyo.supabase.co");
+const PUSH_SUPABASE_KEY = (typeof SUPABASE_KEY !== 'undefined' ? SUPABASE_KEY : "sb_publishable_JaVgg3CuVmI9SczGkoaRZQ_EaYoV9z9");
 
 function getSupabaseClient(){
   if(window.supabase && window.supabase.createClient){
     if(window._gkeSupabase) return window._gkeSupabase;
-    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const client = window.supabase.createClient(PUSH_SUPABASE_URL, PUSH_SUPABASE_KEY);
     window._gkeSupabase = client;
     return client;
   }
@@ -125,7 +126,7 @@ async function activateNotif(){
           const reg = await navigator.serviceWorker.ready;
           await reg.showNotification('GKE Bukit Hindu', {
             body: 'Notifikasi aktif! Kamu akan dapat info jadwal terbaru.',
-            icon:'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png',
+            icon:'./icon-192.png',
             tag:'gke-test',
             data:{url: location.href}
           });
