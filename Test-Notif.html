@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TES NOTIF GKE</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.50.0/dist/umd/supabase.min.js"></script>
+<style>
+body{font-family:sans-serif;padding:20px;background:#f0fdf4}
+#log{white-space:pre-wrap;background:#111;color:#0f0;padding:12px;border-radius:8px;min-height:200px;margin-top:12px;font-size:12px}
+button{padding:14px 20px;border-radius:999px;border:none;font-weight:bold;cursor:pointer}
+#btn{width:200px;height:50px}
+.active{background:#16a34a;color:white}
+.inactive{background:#ddd;color:#333}
+</style>
+</head>
+<body>
+<h2>TES TOMBOL NOTIF GKE</h2>
+<p>Buka halaman ini di HP pakai Chrome, mode incognito</p>
+<div>
+<button id="btn-aktifkan-notif" data-active="false" class="inactive">🔔 Klik untuk Aktif</button>
+</div>
+<div id="info"></div>
+<div id="log"></div>
+
+<script>
+const VAPID_PUBLIC_KEY = "BBY5ufpzNiBTshM6vCySRt5Ag1pRTUllP3VfoHkbGYfwigmqGTVW_00DpHAtQ3E2QMp9oTpzMV91U711LcsN0oY";
+const SUPABASE_URL = "https://gpgjgplqsvyexumoljyo.supabase.co";
+const SUPABASE_KEY = "sb_publishable_JaVgg3CuVmI9SczGkoaRZQ_EaYoV9z9";
+
+function log(msg){
+  const el=document.getElementById('log');
+  el.textContent += "\n" + new Date().toLocaleTimeString() + " - " + msg;
+  console.log(msg);
+}
+function showInfo(){
+  document.getElementById('info').innerHTML = `
+    <p>isSecureContext: <b>${window.isSecureContext}</b> (harus true)</p>
+    <p>Notification in window: <b>${'Notification' in window}</b></p>
+    <p>serviceWorker in navigator: <b>${'serviceWorker' in navigator}</b></p>
+    <p>Permission: <b>${('Notification' in window) ? Notification.permission : 'N/A'}</b></p>
+    <p>UserAgent: ${navigator.userAgent.slice(0,80)}</p>
+  `;
+}
+showInfo();
+
+function getSupabaseClient(){
+  if(window.supabase && window.supabase.createClient){
+    if(window._gkeSupabase) return window._gkeSupabase;
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    window._gkeSupabase = client;
+    return client;
+  }
+  return null;
+}
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for(let i=0;i<rawData.length;++i) outputArray[i]=rawData.charCodeAt(i);
+  return outputArray;
+}
+function updateNotifUI(active){
+  const btn=document.getElementById('btn-aktifkan-notif');
+  if(!btn) return;
+  if(active){
+    btn.dataset.active="true";
+    btn.textContent="🔔 Aktif ✓ - Klik untuk Matikan";
+    btn.className="active";
+  }else{
+    btn.dataset.active="false";
+    btn.textContent="🔔 Klik untuk Aktif";
+    btn.className="inactive";
+  }
+}
+function checkNotifStatus(){
+  const perm = ('Notification' in window) ? Notification.permission : 'unsupported';
+  const localEnabled = localStorage.getItem('gke_notif_enabled')==='true';
+  log(`checkStatus perm=${perm} local=${localEnabled}`);
+  if(perm==='granted' && localEnabled){
+    updateNotifUI(true);
+  }else{
+    updateNotifUI(false);
+  }
+}
+async function subscribeAndSave(){
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    log('SW ready: ' + reg.scope);
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub){
+      log('Bikin subscription baru...');
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+      log('Subscription baru berhasil: ' + sub.endpoint.slice(0,50)+'...');
+    }else{
+      log('Sudah ada subscription');
+    }
+    const client = getSupabaseClient();
+    if(!client){ log('Supabase client gagal'); return sub; }
+    const subJson = sub.toJSON();
+    const { data: existing } = await client.from('push_subscriptions').select('id').eq('endpoint', sub.endpoint).maybeSingle();
+    if(!existing){
+      log('Simpan ke Supabase...');
+      const { error } = await client.from('push_subscriptions').insert({
+        endpoint: sub.endpoint,
+        keys: { p256dh: subJson.keys.p256dh, auth: subJson.keys.auth },
+        subscription: subJson,
+        created_at: new Date().toISOString(),
+        user_agent: navigator.userAgent
+      });
+      if(error){ log('GAGAL SIMPAN: '+error.message); }
+      else{ log('BERHASIL SIMPAN ke Supabase!'); }
+    }else{
+      log('Sudah ada di Supabase id='+existing.id);
+    }
+    return sub;
+  }catch(e){
+    log('ERROR subscribe: ' + e.message);
+    return null;
+  }
+}
+async function activateNotif(){
+  try{
+    log('activateNotif() dipanggil');
+    if('serviceWorker' in navigator){
+      let reg = await navigator.serviceWorker.getRegistration();
+      if(!reg){
+        log('Register SW...');
+        reg = await navigator.serviceWorker.register('sw.js', {scope:'./'});
+      }
+      await navigator.serviceWorker.ready;
+    }
+    localStorage.setItem('gke_notif_enabled','true');
+    updateNotifUI(true);
+    await subscribeAndSave();
+    log('Notifikasi aktif!');
+    setTimeout(async ()=>{
+      try{
+        if(Notification.permission==='granted'){
+          const reg = await navigator.serviceWorker.ready;
+          await reg.showNotification('GKE Bukit Hindu', {
+            body: 'Tes berhasil! Notif aktif.',
+            icon:'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png',
+            tag:'gke-test'
+          });
+          log('Notifikasi tes ditampilkan');
+        }
+      }catch(e){ log('Gagal showNotification: '+e.message); }
+    }, 800);
+  }catch(e){ log('activate error: '+e.message); }
+}
+function toggleNotifikasi(){
+  log('toggleNotifikasi() diklik!');
+  const btn=document.getElementById('btn-aktifkan-notif');
+  if(!btn){ log('btn tidak ketemu'); return; }
+  if(!('Notification' in window)){ log('Browser tidak support Notification'); return; }
+  const isActive = btn.dataset.active==='true';
+  log('isActive='+isActive);
+  if(isActive){
+    (async ()=>{
+      localStorage.setItem('gke_notif_enabled','false');
+      const reg = await navigator.serviceWorker.getRegistration().catch(()=>null);
+      if(reg){
+        const sub = await reg.pushManager.getSubscription().catch(()=>null);
+        if(sub){
+          const client=getSupabaseClient();
+          if(client) await client.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+          await sub.unsubscribe();
+          log('Unsubscribed');
+        }
+      }
+      updateNotifUI(false);
+    })();
+    return;
+  }
+  let perm = Notification.permission;
+  log('Permission saat ini: '+perm);
+  if(perm==='denied'){
+    log('DIBLOKIR! Klik gembok di address bar > Izinkan notifikasi');
+    alert('Notifikasi diblokir. Klik ikon gembok 🔒 di address bar > Set Notifikasi jadi Izinkan, lalu refresh.');
+    return;
+  }
+  if(perm==='default'){
+    log('Minta izin...');
+    Notification.requestPermission().then(result=>{
+      log('Hasil izin: '+result);
+      if(result==='granted') activateNotif();
+      else updateNotifUI(false);
+    });
+    return;
+  }
+  if(perm==='granted') activateNotif();
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  log('DOM ready');
+  checkNotifStatus();
+  const btn=document.getElementById('btn-aktifkan-notif');
+  if(btn){
+    btn.addEventListener('click', (e)=>{
+      e.preventDefault();
+      log('Button click event!');
+      toggleNotifikasi();
+    });
+    btn.addEventListener('touchstart', (e)=>{
+      log('touchstart!');
+    }, {passive:true});
+    log('Button listener terpasang');
+  }else{
+    log('Button tidak ditemukan!');
+  }
+  showInfo();
+});
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js', {scope:'./'}).then(r=>log('SW registered '+r.scope)).catch(e=>log('SW error '+e.message));
+}
+</script>
+</body>
+</html>
