@@ -1,5 +1,5 @@
-// sw.js - GKE Bukit Hindu PWA + Push - PWA FIXED
-const CACHE_NAME = 'gke-bukit-hindu-v3-pwa';
+// sw.js - GKE Bukit Hindu PWA + Push - FIXED v4
+const CACHE_NAME = 'gke-bukit-hindu-v4-pwa';
 const ASSETS = [
   './',
   './ibadah.html',
@@ -14,7 +14,6 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME).then(cache => {
       return cache.addAll(ASSETS).catch(err=>{
         console.warn('[SW] cache addAll fail', err);
-        // tetap lanjut walau gagal cache satu file
         return Promise.resolve();
       });
     })
@@ -38,11 +37,9 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  // Jangan cache API Supabase dan POST
   if(url.href.includes('supabase') || event.request.method!=='GET' || url.protocol==='chrome-extension:'){
     return;
   }
-  // Untuk HTML, network first agar selalu fresh (penting untuk PWA)
   if(event.request.headers.get('accept')?.includes('text/html')){
     event.respondWith(
       fetch(event.request).then(res=>{
@@ -53,12 +50,10 @@ self.addEventListener('fetch', (event) => {
     );
     return;
   }
-  // Untuk asset lain, cache first
   event.respondWith(
     caches.match(event.request).then(cached => {
       if(cached) return cached;
       return fetch(event.request).then(res=>{
-        // cache copy
         if(res.ok){
           const clone = res.clone();
           caches.open(CACHE_NAME).then(c=>c.put(event.request, clone)).catch(()=>{});
@@ -74,25 +69,36 @@ self.addEventListener('push', (event) => {
   let data = {};
   try{
     if(event.data){
-      try{ data = event.data.json(); }catch{ data = {body: event.data.text()}; }
+      try{ data = event.data.json(); }catch{ data = { body: event.data.text() }; }
     }
-  }catch(e){ data = {body: 'Ada jadwal ibadah terbaru'}; }
+  }catch(e){ 
+    data = { body: 'Ada jadwal ibadah terbaru' }; 
+  }
+
+  // FIX: support image dari kirimnotif
   const title = data.title || 'Jadwal Ibadah GKE Bukit Hindu';
   const options = {
     body: data.body || 'Ada jadwal ibadah terbaru, cek sekarang!',
     icon: data.icon || 'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png',
     badge: 'https://i.ibb.co/nM6H3j9K/6ab2a2d4-1b74-4c2d-9dc6-bf2a26ea4c6d-1.png',
+    image: data.image || undefined, // FIX: ini yang hilang di versi lama
     vibrate: [200,100,200],
     tag: 'gke-jadwal',
     renotify: true,
     requireInteraction: false,
     data: { url: data.url || './ibadah.html' }
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+
+  // Hapus field undefined biar gak error di beberapa browser
+  if(!options.image) delete options.image;
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {
-  console.log('[SW] notif click');
+  console.log('[SW] notif click', event.notification.data);
   event.notification.close();
   const url = event.notification.data?.url || './ibadah.html';
   event.waitUntil(
