@@ -1950,37 +1950,28 @@ window.openPopupById=openPopupById; window.onEdit=onEdit; window.onDelete=onDele
 </footer>
 <script src="push-subscribe.js"></script>
 <script>
-  // FIX CHROME MOBILE & PWA - gesture safe
+  // FIX SIMPEL NOTIF - v2 - jangan clone, langsung bind
   (function(){
-    console.log('Bottom PWA check - secure:', window.isSecureContext, 'perm:', Notification.permission);
-
+    console.log('Init notif FIX v2 - secure:', window.isSecureContext, 'perm:', Notification.permission);
     if('serviceWorker' in navigator){
       navigator.serviceWorker.register('sw.js', {scope:'./'}).then(r=>console.log('SW ok', r.scope)).catch(e=>console.error('SW err', e));
     }
-
-    function bindBtn(){
+    function bind(){
       const btn=document.getElementById('btn-aktifkan-notif');
-      if(!btn) return;
-      // remove old listeners
-      const clone=btn.cloneNode(true);
-      btn.parentNode.replaceChild(clone, btn);
-      const fresh=document.getElementById('btn-aktifkan-notif');
-      fresh.addEventListener('click', function(e){
-        // PENTING: panggil toggleNotifikasi LANGSUNG tanpa await di sini, biar Chrome mobile anggap user gesture
+      if(!btn){ console.warn('btn notif tidak ketemu'); return; }
+      btn.onclick = function(e){
         e.preventDefault();
-        console.log('Notif btn clicked - direct call');
+        console.log('Tombol notif diklik!');
         if(typeof toggleNotifikasi==='function'){
           toggleNotifikasi();
         }else{
-          console.error('toggleNotifikasi not ready');
+          alert('push-subscribe.js belum update. Pastikan upload file push-subscribe-fixed-v2-ready.js dan rename jadi push-subscribe.js');
         }
-      }, {passive:false});
-      console.log('Notif btn bound gesture-safe');
+      };
     }
-
-    document.addEventListener('DOMContentLoaded', ()=>{ bindBtn(); if(typeof checkNotifStatus==='function') checkNotifStatus(); });
-    window.addEventListener('load', ()=>{ bindBtn(); if(typeof checkNotifStatus==='function') checkNotifStatus(); setTimeout(()=>{ if(typeof checkNotifStatus==='function') checkNotifStatus(); }, 1000); });
-    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && typeof checkNotifStatus==='function') checkNotifStatus(); });
+    bind();
+    document.addEventListener('DOMContentLoaded', ()=>{ bind(); if(typeof checkNotifStatus==='function') checkNotifStatus(); });
+    window.addEventListener('load', ()=>{ bind(); if(typeof checkNotifStatus==='function') checkNotifStatus(); });
   })();
 </script>
 </body>
