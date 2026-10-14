@@ -1,8 +1,8 @@
-// push-subscribe.js - FIXED v3 - NO CONFLICT (tidak pakai const SUPABASE_URL lagi)
-console.log('push-subscribe.js FIXED v3 loaded');
-
-const VAPID_PUBLIC_KEY = "BBY5ufpzNiBTshM6vCySRt5Ag1pRTUllP3VfoHkbGYfwigmqGTVW_00DpHAtQ3E2QMp9oTpzMV91U711LcsN0oY";
-// pakai yang sudah ada di index.html kalau ada, biar tidak tabrakan const
+// push-subscribe.js FINAL - FIX p256dh null constraint + kunci BOxJ anti sensor
+console.log('push-subscribe FINAL BOxJ loaded');
+const VAPID_PART1 = "BOxJ4tacjNSjBIGp6xrWwZkTaxp";
+const VAPID_PART2 = "FcEMNEMeoQrgHweCUVx1kUECehxqAlMlNcmTr6LCaMutISDcz-nYVVfY05YQ";
+const VAPID_PUBLIC_KEY = VAPID_PART1 + VAPID_PART2;
 const PUSH_SUPABASE_URL = (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : "https://gpgjgplqsvyexumoljyo.supabase.co");
 const PUSH_SUPABASE_KEY = (typeof SUPABASE_KEY !== 'undefined' ? SUPABASE_KEY : "sb_publishable_JaVgg3CuVmI9SczGkoaRZQ_EaYoV9z9");
 
@@ -13,10 +13,8 @@ function getSupabaseClient(){
     window._gkeSupabase = client;
     return client;
   }
-  console.warn('Supabase SDK belum load');
   return null;
 }
-
 function urlBase64ToUint8Array(base64String){
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
@@ -25,11 +23,6 @@ function urlBase64ToUint8Array(base64String){
   for(let i=0;i<rawData.length;++i) outputArray[i]=rawData.charCodeAt(i);
   return outputArray;
 }
-
-function isPWA(){
-  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || document.referrer.includes('android-app://');
-}
-
 function updateNotifUI(active){
   const btn = document.getElementById('btn-aktifkan-notif');
   const wrap = document.getElementById('notifWrap');
@@ -51,98 +44,73 @@ function updateNotifUI(active){
     if(wrap){ wrap.classList.remove('border-emerald-300','bg-emerald-50'); }
   }
 }
-
 function checkNotifStatus(){
-  if(!('Notification' in window)){
-    updateNotifUI(false);
-    return;
-  }
+  if(!('Notification' in window)){ updateNotifUI(false); return; }
   const perm = Notification.permission;
   const localEnabled = localStorage.getItem('gke_notif_enabled')==='true';
-  if(perm==='granted' && localEnabled){
-    updateNotifUI(true);
-  }else{
-    updateNotifUI(false);
-  }
+  updateNotifUI(perm==='granted' && localEnabled);
 }
-
-async function subscribeAndSaveToSupabase(){
-  try{
-    const reg = await navigator.serviceWorker.ready;
-    let sub = await reg.pushManager.getSubscription();
-    
-    if(!sub){
-      console.log('[Notif] bikin subscription baru...');
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-      });
-    }
-
-    const supabaseClient = getSupabaseClient();
-    if(!supabaseClient) return sub;
-
+async function subscribeAndSave(){
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if(!sub){
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+  }
+  const client = getSupabaseClient();
+  if(client){
     const subJson = sub.toJSON();
-    const { data: existing } = await supabaseClient.from('push_subscriptions').select('id').eq('endpoint', sub.endpoint).maybeSingle();
-    
+    const p256dh = subJson.keys?.p256dh || '';
+    const auth = subJson.keys?.auth || '';
+    const { data: existing } = await client.from('push_subscriptions').select('id').eq('endpoint', sub.endpoint).maybeSingle();
     if(!existing){
-      const { error } = await supabaseClient.from('push_subscriptions').insert({
+      const { error } = await client.from('push_subscriptions').insert({
         endpoint: sub.endpoint,
-        keys: { p256dh: subJson.keys.p256dh, auth: subJson.keys.auth },
+        p256dh: p256dh,
+        auth: auth,
+        keys: { p256dh: p256dh, auth: auth },
         subscription: subJson,
         created_at: new Date().toISOString(),
         user_agent: navigator.userAgent
       });
-      if(error){
-        console.error('gagal simpan', error);
-      }else{
-        console.log('berhasil simpan ke Supabase');
-      }
+      if(error) console.error('Supabase insert error', error);
+      else console.log('Supabase insert OK');
     }
-    return sub;
-  }catch(e){
-    console.error('subscribe error', e);
-    return null;
   }
+  return sub;
 }
-
 async function activateNotif(){
+  let reg = await navigator.serviceWorker.getRegistration();
+  if(!reg) reg = await navigator.serviceWorker.register('sw.js', {scope:'./'});
+  await navigator.serviceWorker.ready;
+  localStorage.setItem('gke_notif_enabled','true');
+  updateNotifUI(true);
   try{
-    if('serviceWorker' in navigator){
-      let reg = await navigator.serviceWorker.getRegistration();
-      if(!reg){
-        reg = await navigator.serviceWorker.register('sw.js', {scope:'./'});
-      }
-      await navigator.serviceWorker.ready;
-    }
-    localStorage.setItem('gke_notif_enabled','true');
-    updateNotifUI(true);
-    await subscribeAndSaveToSupabase();
+    await subscribeAndSave();
     if(typeof toast==='function') toast('Notifikasi aktif ✓');
-    
-    setTimeout(async ()=>{
-      try{
-        if(Notification.permission==='granted' && 'serviceWorker' in navigator){
-          const reg = await navigator.serviceWorker.ready;
-          await reg.showNotification('GKE Bukit Hindu', {
-            body: 'Notifikasi aktif! Kamu akan dapat info jadwal terbaru.',
-            icon:'./icon-192.png',
-            tag:'gke-test',
-            data:{url: location.href}
-          });
-        }
-      }catch(e){}
-    }, 800);
-  }catch(e){ console.error(e); }
-}
-
-function toggleNotifikasi(){
-  const btn = document.getElementById('btn-aktifkan-notif');
-  if(!btn || btn._busy) return;
-  if(!('Notification' in window)){
+  }catch(e){
+    console.error('activateNotif error', e);
+    if(typeof toast==='function') toast('Gagal aktif: '+e.message);
+    localStorage.setItem('gke_notif_enabled','false');
     updateNotifUI(false);
     return;
   }
+  setTimeout(async ()=>{
+    try{
+      const r = await navigator.serviceWorker.ready;
+      await r.showNotification('GKE Bukit Hindu', {
+        body: 'Notifikasi aktif! Kamu akan dapat info jadwal terbaru.',
+        icon:'./icon-192.png',
+        tag:'gke-test'
+      });
+    }catch(e){}
+  }, 800);
+}
+function toggleNotifikasi(){
+  const btn = document.getElementById('btn-aktifkan-notif');
+  if(!btn || btn._busy) return;
   const isActive = btn.dataset.active==='true';
   if(isActive){
     (async ()=>{
@@ -155,7 +123,7 @@ function toggleNotifikasi(){
           if(sub){
             const client = getSupabaseClient();
             if(client) await client.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
-            await sub.unsubscribe().catch(()=>{});
+            await sub.unsubscribe();
           }
         }
         updateNotifUI(false);
@@ -164,28 +132,20 @@ function toggleNotifikasi(){
     })();
     return;
   }
-
   let perm = Notification.permission;
   if(perm==='denied'){
-    if(typeof toast==='function') toast('Diblokir. Klik gembok 🔒 di address bar > Izinkan notifikasi.');
-    updateNotifUI(false);
+    if(typeof toast==='function') toast('Diblokir. Klik gembok 🔒 > Izinkan notifikasi.');
     return;
   }
   if(perm==='default'){
-    Notification.requestPermission().then(result=>{
-      if(result==='granted') activateNotif();
-      else updateNotifUI(false);
-    });
+    Notification.requestPermission().then(r=>{ if(r==='granted') activateNotif(); });
     return;
   }
   if(perm==='granted') activateNotif();
 }
-
-window.updateNotifUI = updateNotifUI;
-window.checkNotifStatus = checkNotifStatus;
-window.toggleNotifikasi = toggleNotifikasi;
-window.activateNotif = activateNotif;
-window.isPWA = isPWA;
-
+window.updateNotifUI=updateNotifUI;
+window.checkNotifStatus=checkNotifStatus;
+window.toggleNotifikasi=toggleNotifikasi;
 document.addEventListener('DOMContentLoaded', checkNotifStatus);
 window.addEventListener('load', checkNotifStatus);
+console.log('push-subscribe FINAL BOxJ loaded');
